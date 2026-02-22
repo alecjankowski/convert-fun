@@ -220,11 +220,11 @@ function ShareMoment({ visible }) {
     e.stopPropagation();
     if (navigator.share) {
       try {
-        await navigator.share({ title: "switcheroo", text: "Convert any file, right in your browser.", url: "https://switcheroo.fun" });
+        await navigator.share({ title: "switcheroo", text: "Convert any file, right in your browser.", url: "https://switcheroo.cool" });
       } catch {}
     } else {
       try {
-        await navigator.clipboard.writeText("https://switcheroo.fun");
+        await navigator.clipboard.writeText("https://switcheroo.cool");
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch {}
