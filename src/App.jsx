@@ -65,6 +65,45 @@ function isHeic(type) {
   return type === "image/heic" || type === "image/heif";
 }
 
+// ─── Water Ripple (behind the drop container) ───────────────────────────────
+function WaterRipple({ active, originY }) {
+  const [rings, setRings] = useState([]);
+
+  useEffect(() => {
+    if (!active) return;
+    // Spawn 3 rings with staggered delays
+    const newRings = [0, 1, 2].map((i) => ({
+      id: Date.now() + i,
+      delay: i * 0.15,
+    }));
+    setRings(newRings);
+    const t = setTimeout(() => setRings([]), 1200);
+    return () => clearTimeout(t);
+  }, [active]);
+
+  if (!rings.length) return null;
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden",
+    }}>
+      {rings.map((ring) => (
+        <div key={ring.id} style={{
+          position: "absolute",
+          left: "50%",
+          top: originY,
+          width: 0, height: 0,
+          borderRadius: "50%",
+          border: "2px solid rgba(124, 58, 237, 0.12)",
+          transform: "translate(-50%, -50%)",
+          animation: `waterRipple 1s ${ring.delay}s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards`,
+          boxShadow: "0 0 8px rgba(124, 58, 237, 0.04)",
+        }} />
+      ))}
+    </div>
+  );
+}
+
 // ─── Mesh Background ────────────────────────────────────────────────────────
 function MeshBackground() {
   return (
@@ -393,6 +432,9 @@ export default function ConvertFun() {
   const [downloads, setDownloads] = useState({});
   const [targets, setTargets] = useState({});
   const [dragOver, setDragOver] = useState(false);
+  const [ripple, setRipple] = useState(false);
+  const [rippleY, setRippleY] = useState(0);
+  const dropZoneRef = useRef(null);
   const [totalConverted, setTotalConverted] = useState(0);
   const [glowPhase, setGlowPhase] = useState(0);
   const [mobile] = useState(isMobile);
@@ -446,7 +488,18 @@ export default function ConvertFun() {
     e.preventDefault();
     dragCountRef.current = 0;
     setDragOver(false);
-    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+    if (e.dataTransfer.files.length) {
+      // Trigger ripple from the drop zone's center
+      if (dropZoneRef.current) {
+        const rect = dropZoneRef.current.getBoundingClientRect();
+        setRippleY(rect.top + rect.height / 2);
+      }
+      setRipple(false);
+      // Force re-trigger by toggling off then on
+      requestAnimationFrame(() => setRipple(true));
+      setTimeout(() => setRipple(false), 50);
+      addFiles(e.dataTransfer.files);
+    }
   }, [addFiles]);
 
   const convertImage = useCallback(async (file, targetFormat) => {
@@ -569,6 +622,7 @@ export default function ConvertFun() {
       position: "relative",
     }}>
       <MeshBackground />
+      <WaterRipple active={ripple} originY={rippleY} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 680, margin: "0 auto", padding: "48px 20px 80px" }}>
 
@@ -595,6 +649,7 @@ export default function ConvertFun() {
 
         {/* ── Drop Zone ───────────────────────────────────────────────── */}
         <div
+          ref={dropZoneRef}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
@@ -781,6 +836,22 @@ export default function ConvertFun() {
           0% { transform: translateX(-100%); opacity: 0; }
           30% { opacity: 1; }
           100% { transform: translateX(100%); opacity: 0; }
+        }
+        @keyframes waterRipple {
+          0% {
+            width: 0; height: 0;
+            border-color: rgba(124, 58, 237, 0.15);
+            opacity: 1;
+          }
+          60% {
+            border-color: rgba(16, 185, 129, 0.08);
+            opacity: 0.6;
+          }
+          100% {
+            width: 120vmax; height: 120vmax;
+            border-color: rgba(6, 182, 212, 0.02);
+            opacity: 0;
+          }
         }
         * { box-sizing: border-box; }
       `}</style>
