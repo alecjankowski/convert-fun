@@ -188,7 +188,7 @@ function Logo() {
         animation: "gradientShift 8s ease infinite",
         cursor: "pointer", lineHeight: 1.1, userSelect: "none",
       }}>
-        convert.fun
+        switcheroo
       </h1>
     </a>
   );
@@ -220,11 +220,11 @@ function ShareMoment({ visible }) {
     e.stopPropagation();
     if (navigator.share) {
       try {
-        await navigator.share({ title: "convert.fun", text: "The funnest file converter.", url: "https://convert.fun" });
+        await navigator.share({ title: "switcheroo", text: "Convert any file, right in your browser.", url: "https://switcheroo.fun" });
       } catch {}
     } else {
       try {
-        await navigator.clipboard.writeText("https://convert.fun");
+        await navigator.clipboard.writeText("https://switcheroo.fun");
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch {}
@@ -251,7 +251,7 @@ function ShareMoment({ visible }) {
         marginTop: 10,
       }}
     >
-      {copied ? "Copied!" : "Share convert.fun"}
+      {copied ? "Copied!" : "Share switcheroo"}
     </button>
   );
 }
@@ -470,7 +470,7 @@ function RemoveButton({ hovered, onHover, onClick }) {
 }
 
 // ─── Main App ───────────────────────────────────────────────────────────────
-export default function ConvertFun() {
+export default function Switcheroo() {
   const [files, setFiles] = useState([]);
   const [statuses, setStatuses] = useState({});
   const [downloads, setDownloads] = useState({});
@@ -565,8 +565,63 @@ export default function ConvertFun() {
     try {
       await new Promise((r) => setTimeout(r, 400 + Math.random() * 400));
 
-      if (targetFormat === "COMPRESS" || targetFormat === "OPTIMIZE") {
-        // PDF/GIF passthrough for now
+      if (targetFormat === "COMPRESS") {
+        // PDF compression: render pages to canvas → JPEG → rebuild smaller PDF
+        try {
+          const pdfjsLib = await import("pdfjs-dist");
+          const { PDFDocument } = await import("pdf-lib");
+
+          // Set up pdf.js worker
+          pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+            "pdfjs-dist/build/pdf.worker.min.mjs",
+            import.meta.url
+          ).href;
+
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          const newPdf = await PDFDocument.create();
+
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            // Render at 1.5x scale for decent quality
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement("canvas");
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext("2d");
+            await page.render({ canvasContext: ctx, viewport }).promise;
+
+            // Compress to JPEG at 0.72 quality
+            const jpegBlob = await new Promise((res) =>
+              canvas.toBlob((b) => res(b), "image/jpeg", 0.72)
+            );
+            const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+            const img = await newPdf.embedJpg(jpegBytes);
+
+            // Use original page dimensions (in PDF points, not canvas pixels)
+            const origViewport = page.getViewport({ scale: 1 });
+            const newPage = newPdf.addPage([origViewport.width, origViewport.height]);
+            newPage.drawImage(img, {
+              x: 0, y: 0,
+              width: origViewport.width,
+              height: origViewport.height,
+            });
+          }
+
+          const pdfBytes = await newPdf.save({ useObjectStreams: true });
+          const compressed = new Blob([pdfBytes], { type: "application/pdf" });
+          setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(compressed) }));
+
+          // Show size reduction
+          const pct = Math.round((1 - compressed.size / file.size) * 100);
+          console.log(`PDF compressed: ${(file.size/1024/1024).toFixed(1)}MB → ${(compressed.size/1024/1024).toFixed(1)}MB (${pct}% smaller)`);
+        } catch (pdfErr) {
+          console.error("PDF compression failed:", pdfErr);
+          setStatuses((s) => ({ ...s, [key]: "error" }));
+          return;
+        }
+      } else if (targetFormat === "OPTIMIZE") {
+        // GIF optimization — passthrough for now
         await new Promise((r) => setTimeout(r, 400));
         const blob = new Blob([await file.arrayBuffer()], { type: file.type });
         setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(blob) }));
@@ -676,12 +731,6 @@ export default function ConvertFun() {
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <Logo />
-          <p style={{
-            fontSize: 17, color: "#78716c", marginTop: 10, fontWeight: 500,
-            letterSpacing: "-0.01em",
-          }}>
-            You've never had so much fun converting files.
-          </p>
           {totalConverted > 0 && (
             <div style={{
               display: "inline-block", marginTop: 14, padding: "5px 14px", borderRadius: 100,
