@@ -474,50 +474,22 @@ export default function ConvertFun() {
         const detectedType = detectType(file);
 
         let sourceBlob = file;
-        // HEIC conversion via heic-decode (supports HEVC from modern iPhones)
+        // HEIC conversion via heic-to (supports HEVC from modern iPhones)
         if (isHeic(detectedType)) {
           try {
-            const { default: decode } = await import("heic-decode");
-            const buffer = await file.arrayBuffer();
-            const { data, width, height } = await decode({ buffer });
-
-            const canvas = document.createElement("canvas");
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext("2d");
-
-            // White background for JPG (no transparency)
-            if (targetFormat === "JPG") {
-              ctx.fillStyle = "#ffffff";
-              ctx.fillRect(0, 0, width, height);
-            }
-
-            const imageData = new ImageData(new Uint8ClampedArray(data), width, height);
-            ctx.putImageData(imageData, 0, 0);
-
-            // If JPG, need to redraw over white since putImageData replaces pixels
-            if (targetFormat === "JPG") {
-              const tempCanvas = document.createElement("canvas");
-              tempCanvas.width = width;
-              tempCanvas.height = height;
-              const tempCtx = tempCanvas.getContext("2d");
-              tempCtx.fillStyle = "#ffffff";
-              tempCtx.fillRect(0, 0, width, height);
-              tempCtx.drawImage(canvas, 0, 0);
-              const tm = TARGET_META[targetFormat];
-              const blob = await new Promise((res) => tempCanvas.toBlob(res, tm.mime, 0.92));
-              setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(blob) }));
-            } else {
-              const tm = TARGET_META[targetFormat];
-              const blob = await new Promise((res) => canvas.toBlob(res, tm.mime, 0.92));
-              setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(blob) }));
-            }
-
+            const { heicTo } = await import("heic-to");
+            const tm = TARGET_META[targetFormat];
+            const converted = await heicTo({
+              blob: file,
+              type: tm.mime,
+              quality: 0.92,
+            });
+            setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(converted) }));
             setStatuses((s) => ({ ...s, [key]: "done" }));
             setTotalConverted((c) => c + 1);
             return;
           } catch (heicErr) {
-            console.error("heic-decode failed:", heicErr);
+            console.error("heic-to failed:", heicErr);
             setStatuses((s) => ({ ...s, [key]: "error" }));
             return;
           }
