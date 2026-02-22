@@ -101,12 +101,12 @@ function WaterRipple({ active, originY }) {
           background: `radial-gradient(
             ellipse at center,
             transparent 0%,
-            transparent 30%,
-            rgba(124, 58, 237, 0.035) 40%,
-            rgba(168, 120, 240, 0.05) 48%,
-            rgba(236, 72, 153, 0.04) 55%,
-            rgba(59, 130, 246, 0.03) 63%,
-            rgba(16, 185, 129, 0.025) 72%,
+            transparent 28%,
+            rgba(124, 58, 237, 0.07) 38%,
+            rgba(168, 120, 240, 0.09) 46%,
+            rgba(236, 72, 153, 0.07) 54%,
+            rgba(59, 130, 246, 0.05) 63%,
+            rgba(16, 185, 129, 0.04) 72%,
             transparent 85%,
             transparent 100%
           )`,
@@ -447,6 +447,7 @@ export default function ConvertFun() {
   const [dragOver, setDragOver] = useState(false);
   const [ripple, setRipple] = useState(false);
   const [rippleY, setRippleY] = useState(0);
+  const [plunk, setPlunk] = useState(false);
   const dropZoneRef = useRef(null);
   const [totalConverted, setTotalConverted] = useState(0);
   const [glowPhase, setGlowPhase] = useState(0);
@@ -508,9 +509,11 @@ export default function ConvertFun() {
         setRippleY(rect.top + rect.height / 2);
       }
       setRipple(false);
+      setPlunk(true);
       // Force re-trigger by toggling off then on
       requestAnimationFrame(() => setRipple(true));
       setTimeout(() => setRipple(false), 50);
+      setTimeout(() => setPlunk(false), 600);
       addFiles(e.dataTransfer.files);
     }
   }, [addFiles]);
@@ -676,8 +679,9 @@ export default function ConvertFun() {
               : "rgba(255,255,255,0.55)",
             backdropFilter: "blur(20px)",
             cursor: "pointer",
-            transition: "all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            transition: plunk ? "none" : "all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
             transform: dragOver ? "scale(1.02)" : "scale(1)",
+            animation: plunk ? "dropPlunk 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : "none",
             boxShadow: glowShadow,
             textAlign: "center",
             border: dragOver ? "1.5px solid rgba(255,255,255,0.6)" : "1px solid rgba(0,0,0,0.04)",
@@ -872,6 +876,23 @@ export default function ConvertFun() {
             width: 250vmax;
             height: 250vmax;
             opacity: 0;
+          }
+        }
+        @keyframes dropPlunk {
+          0% {
+            transform: scale(1.02);
+          }
+          20% {
+            transform: scale(0.95) translateY(4px);
+          }
+          50% {
+            transform: scale(1.03) translateY(-2px);
+          }
+          75% {
+            transform: scale(0.99);
+          }
+          100% {
+            transform: scale(1);
           }
         }
         * { box-sizing: border-box; }
