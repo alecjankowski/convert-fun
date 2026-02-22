@@ -547,7 +547,7 @@ export default function ConvertFun() {
           onClick={() => inputRef.current?.click()}
           style={{
             borderRadius: 28,
-            padding: files.length ? "24px 28px" : "64px 32px",
+            padding: files.length ? "24px 28px" : "100px 32px",
             background: dragOver
               ? "rgba(255,255,255,0.95)"
               : "rgba(255,255,255,0.55)",
@@ -681,7 +681,6 @@ export default function ConvertFun() {
 
       {/* ── Global Styles ───────────────────────────────────────────── */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         @keyframes gradientShift {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
