@@ -220,7 +220,7 @@ function ShareMoment({ visible }) {
     e.stopPropagation();
     if (navigator.share) {
       try {
-        await navigator.share({ title: "switcheroo", text: "Convert any file, right in your browser.", url: "https://switcheroo.cool" });
+        await navigator.share({ title: "switcheroo", text: "hi, i'm the internet's most delightful file converter. what do you wanna switch?", url: "https://switcheroo.cool" });
       } catch {}
     } else {
       try {
@@ -621,10 +621,43 @@ export default function Switcheroo() {
           return;
         }
       } else if (targetFormat === "OPTIMIZE") {
-        // GIF optimization — passthrough for now
-        await new Promise((r) => setTimeout(r, 400));
-        const blob = new Blob([await file.arrayBuffer()], { type: file.type });
-        setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(blob) }));
+        // GIF optimization via gifsicle WASM
+        try {
+          const gifsicle = (await import("gifsicle-wasm-browser")).default;
+          const arrayBuffer = await file.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          const result = await gifsicle.run({
+            input: [{ file: uint8Array, name: "input.gif" }],
+            command: [
+              "-U",            // unoptimize first for better re-optimization
+              "--colors", "128", // reduce palette to 128 colors
+              "-O2",           // level 2 optimization
+              "--lossy=50",    // moderate lossy compression
+              "-o", "/out/output.gif",
+              "input.gif",
+            ],
+          });
+
+          if (result && result.length > 0) {
+            const outputFile = result.find((f) => f.name === "output.gif");
+            if (outputFile) {
+              const optimized = new Blob([outputFile.file], { type: "image/gif" });
+              setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(optimized) }));
+              const pct = Math.round((1 - optimized.size / file.size) * 100);
+              console.log(`GIF optimized: ${(file.size/1024).toFixed(0)}KB → ${(optimized.size/1024).toFixed(0)}KB (${pct}% smaller)`);
+            } else {
+              throw new Error("No output file from gifsicle");
+            }
+          } else {
+            throw new Error("gifsicle returned empty result");
+          }
+        } catch (gifErr) {
+          console.error("GIF optimization failed:", gifErr);
+          // Fallback: return original file
+          const blob = new Blob([await file.arrayBuffer()], { type: file.type });
+          setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(blob) }));
+        }
       } else {
         const detectedType = detectType(file);
 
