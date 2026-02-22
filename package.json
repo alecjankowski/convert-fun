@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "dependencies": {
+"dependencies": {
+    "heic2any": "^0.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
