@@ -65,52 +65,83 @@ function isHeic(type) {
   return type === "image/heic" || type === "image/heif";
 }
 
-// ─── Water Ripple (behind the drop container) ───────────────────────────────
-// Slow, deep-water ripple — like AirDrop's liquid surface effect.
-// Uses multiple soft blurred layers to create a realistic refraction look
-// with no visible "vector lines". Think: big surface, big body of water.
+// ─── Water Ripple + Sparkles (behind the drop container) ─────────────────────
+// One slow, prominent deep-water ripple with subtle magic sparkles.
+// The ripple is a soft blurred gradient wash. The sparkles are tiny dots
+// that drift outward and fade, like light catching disturbed water.
 function WaterRipple({ active, originY }) {
-  const [rings, setRings] = useState([]);
+  const [show, setShow] = useState(false);
+  const [sparkles, setSparkles] = useState([]);
 
   useEffect(() => {
     if (!active) return;
-    const newRings = [0, 1].map((i) => ({
-      id: Date.now() + i,
-      delay: i * 0.7,
-    }));
-    setRings(newRings);
-    const t = setTimeout(() => setRings([]), 7000);
+    setShow(true);
+    // Generate sparkle particles — small glinting dots that drift outward
+    const newSparkles = Array.from({ length: 14 }, (_, i) => {
+      const angle = (Math.PI * 2 * i) / 14 + (Math.random() - 0.5) * 0.4;
+      const dist = 80 + Math.random() * 180;
+      return {
+        id: Date.now() + i,
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist * 0.55, // flatter spread, like a surface
+        delay: Math.random() * 0.4,
+        duration: 1.2 + Math.random() * 1.0,
+        size: 2 + Math.random() * 3,
+        color: ["#c4b5fd", "#fbcfe8", "#a5f3fc", "#d9f99d", "#fde68a"][Math.floor(Math.random() * 5)],
+      };
+    });
+    setSparkles(newSparkles);
+    const t = setTimeout(() => { setShow(false); setSparkles([]); }, 5500);
     return () => clearTimeout(t);
   }, [active]);
 
-  if (!rings.length) return null;
+  if (!show && !sparkles.length) return null;
 
   return (
     <div style={{
       position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden",
     }}>
-      {rings.map((ring) => (
-        <div key={ring.id} style={{
+      {/* The single ripple wave */}
+      {show && (
+        <div style={{
           position: "absolute",
           left: "50%",
           top: originY,
           width: 0, height: 0,
           borderRadius: "50%",
           transform: "translate(-50%, -50%)",
-          filter: "blur(40px)",
+          filter: "blur(45px)",
           background: `radial-gradient(
             ellipse at center,
             transparent 0%,
-            transparent 28%,
-            rgba(124, 58, 237, 0.07) 38%,
-            rgba(168, 120, 240, 0.09) 46%,
-            rgba(236, 72, 153, 0.07) 54%,
-            rgba(59, 130, 246, 0.05) 63%,
-            rgba(16, 185, 129, 0.04) 72%,
-            transparent 85%,
+            transparent 22%,
+            rgba(124, 58, 237, 0.10) 34%,
+            rgba(168, 120, 240, 0.13) 43%,
+            rgba(236, 72, 153, 0.10) 52%,
+            rgba(59, 130, 246, 0.07) 62%,
+            rgba(16, 185, 129, 0.05) 73%,
+            transparent 87%,
             transparent 100%
           )`,
-          animation: `waterRipple 5s ${ring.delay}s cubic-bezier(0.15, 0.5, 0.3, 1) forwards`,
+          animation: "waterRipple 5s cubic-bezier(0.12, 0.5, 0.25, 1) forwards",
+        }} />
+      )}
+      {/* Sparkle particles */}
+      {sparkles.map((s) => (
+        <div key={s.id} style={{
+          position: "absolute",
+          left: "50%",
+          top: originY,
+          width: s.size,
+          height: s.size,
+          borderRadius: "50%",
+          background: s.color,
+          boxShadow: `0 0 ${s.size + 2}px ${s.color}`,
+          opacity: 0,
+          transform: "translate(-50%, -50%)",
+          animation: `sparkle ${s.duration}s ${s.delay}s ease-out forwards`,
+          "--sx": `${s.x}px`,
+          "--sy": `${s.y}px`,
         }} />
       ))}
     </div>
@@ -876,6 +907,24 @@ export default function ConvertFun() {
             width: 250vmax;
             height: 250vmax;
             opacity: 0;
+          }
+        }
+        @keyframes sparkle {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) translate(0px, 0px) scale(0);
+          }
+          15% {
+            opacity: 1;
+            transform: translate(-50%, -50%) translate(calc(var(--sx) * 0.3), calc(var(--sy) * 0.3)) scale(1.2);
+          }
+          50% {
+            opacity: 0.8;
+            transform: translate(-50%, -50%) translate(calc(var(--sx) * 0.7), calc(var(--sy) * 0.7)) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) translate(var(--sx), var(--sy)) scale(0.3);
           }
         }
         @keyframes dropPlunk {
