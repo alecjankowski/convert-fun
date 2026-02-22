@@ -66,8 +66,9 @@ function isHeic(type) {
 }
 
 // ─── Water Ripple (behind the drop container) ───────────────────────────────
-// Two slow, fat, deep-water ripples — like AirDrop's liquid surface effect.
-// Uses thick radial-gradient bands instead of borders for that "depth" feel.
+// Slow, deep-water ripple — like AirDrop's liquid surface effect.
+// Uses multiple soft blurred layers to create a realistic refraction look
+// with no visible "vector lines". Think: big surface, big body of water.
 function WaterRipple({ active, originY }) {
   const [rings, setRings] = useState([]);
 
@@ -75,10 +76,10 @@ function WaterRipple({ active, originY }) {
     if (!active) return;
     const newRings = [0, 1].map((i) => ({
       id: Date.now() + i,
-      delay: i * 0.4,
+      delay: i * 0.7,
     }));
     setRings(newRings);
-    const t = setTimeout(() => setRings([]), 2800);
+    const t = setTimeout(() => setRings([]), 7000);
     return () => clearTimeout(t);
   }, [active]);
 
@@ -96,16 +97,20 @@ function WaterRipple({ active, originY }) {
           width: 0, height: 0,
           borderRadius: "50%",
           transform: "translate(-50%, -50%)",
+          filter: "blur(40px)",
           background: `radial-gradient(
             ellipse at center,
             transparent 0%,
-            transparent 55%,
-            rgba(124, 58, 237, 0.06) 62%,
-            rgba(236, 72, 153, 0.04) 70%,
-            rgba(16, 185, 129, 0.03) 78%,
-            transparent 88%
+            transparent 30%,
+            rgba(124, 58, 237, 0.035) 40%,
+            rgba(168, 120, 240, 0.05) 48%,
+            rgba(236, 72, 153, 0.04) 55%,
+            rgba(59, 130, 246, 0.03) 63%,
+            rgba(16, 185, 129, 0.025) 72%,
+            transparent 85%,
+            transparent 100%
           )`,
-          animation: `waterRipple 2.2s ${ring.delay}s cubic-bezier(0.2, 0.6, 0.35, 1) forwards`,
+          animation: `waterRipple 5s ${ring.delay}s cubic-bezier(0.15, 0.5, 0.3, 1) forwards`,
         }} />
       ))}
     </div>
@@ -851,15 +856,21 @@ export default function ConvertFun() {
             height: 0;
             opacity: 0;
           }
-          8% {
+          5% {
+            opacity: 0.7;
+          }
+          30% {
             opacity: 1;
           }
-          70% {
-            opacity: 0.5;
+          60% {
+            opacity: 0.6;
+          }
+          85% {
+            opacity: 0.2;
           }
           100% {
-            width: 200vmax;
-            height: 200vmax;
+            width: 250vmax;
+            height: 250vmax;
             opacity: 0;
           }
         }
