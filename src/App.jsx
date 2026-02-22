@@ -474,12 +474,10 @@ export default function ConvertFun() {
         const detectedType = detectType(file);
 
         let sourceBlob = file;
-        // HEIC conversion via heic2any with native fallback
-        if (isHeic(detectedType)) {
+        // HEIC conversion via heic2any (loaded from CDN) with native fallback
+        if (isHeic(detectedType) && window.heic2any) {
           try {
-            const heic2anyModule = await import("heic2any");
-            const heic2any = heic2anyModule.default;
-            const converted = await heic2any({
+            const converted = await window.heic2any({
               blob: file,
               toType: TARGET_META[targetFormat].mime,
               quality: 0.92,
