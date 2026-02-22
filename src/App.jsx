@@ -36,10 +36,12 @@ const CONVERSION_SUGGESTIONS = [
 ];
 
 function detectType(file) {
-  if (file.type && FORMATS[file.type]) return file.type;
+  // Check extension first for HEIC since browsers often report empty/wrong MIME
   const ext = file.name.split(".").pop().toLowerCase();
-  const map = { heic: "image/heic", heif: "image/heif", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", avif: "image/avif", svg: "image/svg+xml", pdf: "application/pdf" };
-  return map[ext] || null;
+  const extMap = { heic: "image/heic", heif: "image/heif", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", avif: "image/avif", svg: "image/svg+xml", pdf: "application/pdf" };
+  if ((ext === "heic" || ext === "heif") && extMap[ext]) return extMap[ext];
+  if (file.type && FORMATS[file.type]) return file.type;
+  return extMap[ext] || null;
 }
 
 function baseName(name) {
@@ -59,37 +61,8 @@ function isMobile() {
   return /iPhone|iPad|iPod|Android/i.test(navigator?.userAgent || "");
 }
 
-// ─── Confetti (first conversion = big, after that = subtle) ─────────────────
-function Confetti({ active, isFirst }) {
-  const [particles, setParticles] = useState([]);
-  useEffect(() => {
-    if (!active) { setParticles([]); return; }
-    const cols = ["#f59e0b", "#10b981", "#7c3aed", "#ec4899", "#06b6d4", "#ef4444", "#22d3ee", "#facc15"];
-    const count = isFirst ? 50 : 16;
-    const p = Array.from({ length: count }, (_, i) => ({
-      id: i, x: Math.random() * 100, y: -10 - Math.random() * 20,
-      color: cols[Math.floor(Math.random() * cols.length)],
-      size: isFirst ? (5 + Math.random() * 7) : (4 + Math.random() * 4),
-      delay: Math.random() * (isFirst ? 0.4 : 0.2),
-      duration: 1.5 + Math.random() * 1.5, rotation: Math.random() * 360,
-    }));
-    setParticles(p);
-    const t = setTimeout(() => setParticles([]), 3500);
-    return () => clearTimeout(t);
-  }, [active, isFirst]);
-  if (!particles.length) return null;
-  return (
-    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999, overflow: "hidden" }}>
-      {particles.map((p) => (
-        <div key={p.id} style={{
-          position: "absolute", left: `${p.x}%`, top: `${p.y}%`, width: p.size, height: p.size,
-          backgroundColor: p.color, borderRadius: p.size > 9 ? "50%" : "2px",
-          transform: `rotate(${p.rotation}deg)`,
-          animation: `confettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
-        }} />
-      ))}
-    </div>
-  );
+function isHeic(type) {
+  return type === "image/heic" || type === "image/heif";
 }
 
 // ─── Mesh Background ────────────────────────────────────────────────────────
@@ -207,11 +180,19 @@ function FileCard({ file, onConvert, onRemove, status, downloadUrl, targetFormat
   const isUnsupported = !fmt;
   const [hoveredBtn, setHoveredBtn] = useState(null);
   const [xHovered, setXHovered] = useState(false);
+  const [showSuccessFlash, setShowSuccessFlash] = useState(false);
+
+  // Get the "also convert to" targets — all targets except the one already converted
+  const alsoTargets = fmt ? fmt.targets.filter((t) => t !== targetFormat) : [];
 
   useEffect(() => {
     if (status === "done" && downloadUrl && targetFormat) {
       const filename = `${baseName(file.name)}.${TARGET_META[targetFormat].ext}`;
       triggerDownload(downloadUrl, filename);
+      // Trigger success flash
+      setShowSuccessFlash(true);
+      const t = setTimeout(() => setShowSuccessFlash(false), 800);
+      return () => clearTimeout(t);
     }
   }, [status, downloadUrl, targetFormat, file.name]);
 
@@ -226,9 +207,10 @@ function FileCard({ file, onConvert, onRemove, status, downloadUrl, targetFormat
         : "0 2px 16px rgba(0,0,0,0.04)",
       border: `1.5px solid ${isUnsupported ? "#e5e7eb" : status === "done" ? "#10b98144" : status === "error" ? "#ef444433" : "rgba(0,0,0,0.04)"}`,
       transition: "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
-      animation: "cardEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+      animation: showSuccessFlash ? "successPulse 0.8s ease both" : "cardEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both",
       position: "relative", overflow: "hidden",
     }}>
+      {/* Converting progress bar */}
       {status === "converting" && (
         <div style={{
           position: "absolute", bottom: 0, left: 0, height: 3,
@@ -237,19 +219,31 @@ function FileCard({ file, onConvert, onRemove, status, downloadUrl, targetFormat
         }} />
       )}
 
+      {/* Success shimmer overlay */}
+      {showSuccessFlash && (
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: 20,
+          background: "linear-gradient(90deg, transparent 0%, rgba(16,185,129,0.08) 50%, transparent 100%)",
+          animation: "shimmer 0.8s ease both",
+          pointerEvents: "none",
+        }} />
+      )}
+
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         {/* Format badge */}
         <div style={{
           width: 44, height: 44, borderRadius: 12, flexShrink: 0,
           background: isUnsupported ? "#f3f4f6"
+            : status === "done" ? "linear-gradient(135deg, #10b98118, #10b98108)"
             : status === "error" ? "#fef2f2"
             : `linear-gradient(135deg, ${fmt.color}18, ${fmt.color}08)`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 11, fontWeight: 800,
-          color: isUnsupported ? "#9ca3af" : status === "error" ? "#ef4444" : fmt.color,
+          fontSize: status === "done" ? 18 : 11, fontWeight: 800,
+          color: isUnsupported ? "#9ca3af" : status === "done" ? "#10b981" : status === "error" ? "#ef4444" : fmt.color,
           letterSpacing: "0.06em",
+          transition: "all 0.4s ease",
         }}>
-          {isUnsupported ? "???" : status === "error" ? "!" : fmt.label}
+          {isUnsupported ? "???" : status === "done" ? "\u2713" : status === "error" ? "!" : fmt.label}
         </div>
 
         {/* File info */}
@@ -257,9 +251,11 @@ function FileCard({ file, onConvert, onRemove, status, downloadUrl, targetFormat
           <div style={{ fontWeight: 600, fontSize: 14, color: "#1f2937", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {file.name}
           </div>
-          <div style={{ fontSize: 12, color: status === "error" ? "#ef4444" : "#9ca3af", marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: status === "error" ? "#ef4444" : status === "done" ? "#10b981" : "#9ca3af", marginTop: 2, transition: "color 0.3s" }}>
             {status === "error"
               ? "Couldn\u2019t convert this file"
+              : status === "done"
+              ? `Converted to ${TARGET_META[targetFormat].ext.toUpperCase()}`
               : file.size < 1024 * 1024
                 ? `${(file.size / 1024).toFixed(1)} KB`
                 : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
@@ -291,10 +287,7 @@ function FileCard({ file, onConvert, onRemove, status, downloadUrl, targetFormat
             <RemoveButton hovered={xHovered} onHover={setXHovered} onClick={(e) => { e.stopPropagation(); onRemove(); }} />
           </div>
         ) : status === "done" ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, color: "#10b981", fontWeight: 700, animation: "popIn 0.4s cubic-bezier(0.34,1.56,0.64,1) both" }}>
-              Saved!
-            </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <button onClick={(e) => { e.stopPropagation(); triggerDownload(downloadUrl, `${baseName(file.name)}.${TARGET_META[targetFormat].ext}`); }}
               style={{
                 padding: "6px 14px", borderRadius: 10, border: "1.5px solid #d1d5db",
@@ -306,6 +299,27 @@ function FileCard({ file, onConvert, onRemove, status, downloadUrl, targetFormat
             >
               Re-download
             </button>
+            {alsoTargets.map((t) => {
+              const tm = TARGET_META[t];
+              const isHovered = hoveredBtn === t;
+              return (
+                <button key={t}
+                  onClick={(e) => { e.stopPropagation(); onConvert(file, t); }}
+                  onMouseEnter={() => setHoveredBtn(t)}
+                  onMouseLeave={() => setHoveredBtn(null)}
+                  style={{
+                    padding: "6px 14px", borderRadius: 10,
+                    border: `1.5px solid ${isHovered ? tm.color : "#e5e7eb"}`,
+                    background: isHovered ? `${tm.color}08` : "white",
+                    color: isHovered ? tm.color : "#9ca3af",
+                    fontWeight: 600, fontSize: 12, cursor: "pointer",
+                    transition: "all 0.25s ease",
+                  }}
+                >
+                  Also {tm.btnLabel}
+                </button>
+              );
+            })}
           </div>
         ) : status === "converting" ? (
           <div style={{
@@ -379,7 +393,6 @@ export default function ConvertFun() {
   const [downloads, setDownloads] = useState({});
   const [targets, setTargets] = useState({});
   const [dragOver, setDragOver] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
   const [totalConverted, setTotalConverted] = useState(0);
   const [glowPhase, setGlowPhase] = useState(0);
   const [mobile] = useState(isMobile);
@@ -438,19 +451,53 @@ export default function ConvertFun() {
 
   const convertImage = useCallback(async (file, targetFormat) => {
     const key = file.name + file.lastModified;
+    // Clear previous conversion state so card resets to fresh "converting"
     setStatuses((s) => ({ ...s, [key]: "converting" }));
     setTargets((t) => ({ ...t, [key]: targetFormat }));
+    // Clear old download URL
+    setDownloads((d) => {
+      if (d[key]) URL.revokeObjectURL(d[key]);
+      const n = { ...d };
+      delete n[key];
+      return n;
+    });
 
     try {
-      await new Promise((r) => setTimeout(r, 600 + Math.random() * 500));
+      await new Promise((r) => setTimeout(r, 400 + Math.random() * 400));
 
       if (targetFormat === "COMPRESS" || targetFormat === "OPTIMIZE") {
+        // PDF/GIF passthrough for now
         await new Promise((r) => setTimeout(r, 400));
         const blob = new Blob([await file.arrayBuffer()], { type: file.type });
         setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(blob) }));
       } else {
+        const detectedType = detectType(file);
+
+        let sourceBlob = file;
+        // HEIC conversion via heic2any with native fallback
+        if (isHeic(detectedType)) {
+          try {
+            const heic2anyModule = await import("heic2any");
+            const heic2any = heic2anyModule.default;
+            const converted = await heic2any({
+              blob: file,
+              toType: TARGET_META[targetFormat].mime,
+              quality: 0.92,
+            });
+            sourceBlob = Array.isArray(converted) ? converted[0] : converted;
+            setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(sourceBlob) }));
+            setStatuses((s) => ({ ...s, [key]: "done" }));
+            setTotalConverted((c) => c + 1);
+            return;
+          } catch (heicErr) {
+            console.warn("heic2any failed, trying native decode:", heicErr);
+            // Fall through to canvas-based conversion below
+          }
+        }
+
+        // Canvas-based conversion (for non-HEIC, or HEIC fallback via native decode)
         const tm = TARGET_META[targetFormat];
-        const bitmap = await createImageBitmap(file);
+        const bitmap = await createImageBitmap(sourceBlob);
         const canvas = document.createElement("canvas");
         canvas.width = bitmap.width;
         canvas.height = bitmap.height;
@@ -466,8 +513,6 @@ export default function ConvertFun() {
 
       setStatuses((s) => ({ ...s, [key]: "done" }));
       setTotalConverted((c) => c + 1);
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 100);
     } catch (err) {
       console.error(err);
       setStatuses((s) => ({ ...s, [key]: "error" }));
@@ -506,6 +551,17 @@ export default function ConvertFun() {
     ? `0 0 30px hsla(${hue1},85%,60%,0.35), 0 0 60px hsla(${hue2},85%,60%,0.2), 0 0 90px hsla(${hue3},85%,60%,0.1), inset 0 0 30px hsla(${hue1},85%,70%,0.06)`
     : "0 2px 20px rgba(0,0,0,0.03)";
 
+  // Drop zone padding — when files exist and dragging, expand to ~2x height
+  const hasFiles = files.length > 0;
+  let dropPadding;
+  if (!hasFiles) {
+    dropPadding = "100px 32px";
+  } else if (dragOver) {
+    dropPadding = "56px 28px";
+  } else {
+    dropPadding = "24px 28px";
+  }
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -513,7 +569,6 @@ export default function ConvertFun() {
       position: "relative",
     }}>
       <MeshBackground />
-      <Confetti active={showConfetti} isFirst={totalConverted <= 1} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 680, margin: "0 auto", padding: "48px 20px 80px" }}>
 
@@ -547,15 +602,13 @@ export default function ConvertFun() {
           onClick={() => inputRef.current?.click()}
           style={{
             borderRadius: 28,
-            padding: files.length ? "24px 28px" : "100px 32px",
+            padding: dropPadding,
             background: dragOver
               ? "rgba(255,255,255,0.95)"
               : "rgba(255,255,255,0.55)",
             backdropFilter: "blur(20px)",
             cursor: "pointer",
-            transition: dragOver
-              ? "background 0.3s ease, padding 0.4s cubic-bezier(0.34,1.56,0.64,1), transform 0.4s cubic-bezier(0.34,1.56,0.64,1)"
-              : "all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            transition: "all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
             transform: dragOver ? "scale(1.02)" : "scale(1)",
             boxShadow: glowShadow,
             textAlign: "center",
@@ -593,9 +646,14 @@ export default function ConvertFun() {
           ) : (
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              color: "#7c3aed", fontWeight: 600, fontSize: 14,
+              color: dragOver ? "#7c3aed" : "#7c3aed",
+              fontWeight: 600, fontSize: dragOver ? 16 : 14,
+              transition: "all 0.4s ease",
             }}>
-              <span style={{ fontSize: 18 }}>+</span> {mobile ? "Add more files" : "Drop more files or click to add"}
+              <span style={{
+                fontSize: dragOver ? 22 : 18,
+                transition: "font-size 0.4s ease",
+              }}>+</span> {mobile ? "Add more files" : dragOver ? "Drop it!" : "Drop more files or click to add"}
             </div>
           )}
         </div>
@@ -693,10 +751,6 @@ export default function ConvertFun() {
           75% { transform: translate(2%, 1%) rotate(0.3deg); }
           100% { transform: translate(-1%, -2%) rotate(-0.3deg); }
         }
-        @keyframes confettiFall {
-          0% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
-          100% { opacity: 0; transform: translateY(110vh) rotate(720deg) scale(0.4); }
-        }
         @keyframes cardEnter {
           0% { opacity: 0; transform: translateY(16px) scale(0.97); }
           100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -717,6 +771,16 @@ export default function ConvertFun() {
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        @keyframes successPulse {
+          0% { box-shadow: 0 4px 24px rgba(16,185,129,0.12); }
+          40% { box-shadow: 0 4px 32px rgba(16,185,129,0.25), 0 0 0 4px rgba(16,185,129,0.08); }
+          100% { box-shadow: 0 4px 24px rgba(16,185,129,0.12); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); opacity: 0; }
+          30% { opacity: 1; }
+          100% { transform: translateX(100%); opacity: 0; }
         }
         * { box-sizing: border-box; }
       `}</style>
