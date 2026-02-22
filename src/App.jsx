@@ -66,18 +66,19 @@ function isHeic(type) {
 }
 
 // ─── Water Ripple (behind the drop container) ───────────────────────────────
+// Two slow, fat, deep-water ripples — like AirDrop's liquid surface effect.
+// Uses thick radial-gradient bands instead of borders for that "depth" feel.
 function WaterRipple({ active, originY }) {
   const [rings, setRings] = useState([]);
 
   useEffect(() => {
     if (!active) return;
-    // Spawn 3 rings with staggered delays
-    const newRings = [0, 1, 2].map((i) => ({
+    const newRings = [0, 1].map((i) => ({
       id: Date.now() + i,
-      delay: i * 0.15,
+      delay: i * 0.4,
     }));
     setRings(newRings);
-    const t = setTimeout(() => setRings([]), 1200);
+    const t = setTimeout(() => setRings([]), 2800);
     return () => clearTimeout(t);
   }, [active]);
 
@@ -94,10 +95,17 @@ function WaterRipple({ active, originY }) {
           top: originY,
           width: 0, height: 0,
           borderRadius: "50%",
-          border: "2px solid rgba(124, 58, 237, 0.12)",
           transform: "translate(-50%, -50%)",
-          animation: `waterRipple 1s ${ring.delay}s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards`,
-          boxShadow: "0 0 8px rgba(124, 58, 237, 0.04)",
+          background: `radial-gradient(
+            ellipse at center,
+            transparent 0%,
+            transparent 55%,
+            rgba(124, 58, 237, 0.06) 62%,
+            rgba(236, 72, 153, 0.04) 70%,
+            rgba(16, 185, 129, 0.03) 78%,
+            transparent 88%
+          )`,
+          animation: `waterRipple 2.2s ${ring.delay}s cubic-bezier(0.2, 0.6, 0.35, 1) forwards`,
         }} />
       ))}
     </div>
@@ -839,17 +847,19 @@ export default function ConvertFun() {
         }
         @keyframes waterRipple {
           0% {
-            width: 0; height: 0;
-            border-color: rgba(124, 58, 237, 0.15);
+            width: 0;
+            height: 0;
+            opacity: 0;
+          }
+          8% {
             opacity: 1;
           }
-          60% {
-            border-color: rgba(16, 185, 129, 0.08);
-            opacity: 0.6;
+          70% {
+            opacity: 0.5;
           }
           100% {
-            width: 120vmax; height: 120vmax;
-            border-color: rgba(6, 182, 212, 0.02);
+            width: 200vmax;
+            height: 200vmax;
             opacity: 0;
           }
         }
