@@ -33,6 +33,7 @@ const CONVERSION_SUGGESTIONS = [
   "SVG \u2192 PNG",
   "AVIF \u2192 JPG",
   "PNG \u2192 JPG",
+  "PDF Merge",
 ];
 
 function detectType(file) {
@@ -63,6 +64,17 @@ function isMobile() {
 
 function isHeic(type) {
   return type === "image/heic" || type === "image/heif";
+}
+
+// Types that can be merged into a combined PDF
+const MERGEABLE_TYPES = new Set([
+  "image/heic", "image/heif", "image/jpeg", "image/jpg", "image/png",
+  "image/webp", "image/avif", "image/svg+xml", "image/gif", "application/pdf",
+]);
+
+function isMergeable(file) {
+  const type = detectType(file);
+  return type && MERGEABLE_TYPES.has(type);
 }
 
 // ─── Water Ripple + Sparkles (behind the drop container) ─────────────────────
@@ -499,6 +511,10 @@ export default function Switcheroo() {
   const dragCountRef = useRef(0);
   const { suggestion, fade } = useRotatingSuggestion();
 
+  // ── PDF Merge state ──
+  const [mergeStatus, setMergeStatus] = useState(null); // null | "merging" | "done" | "error"
+  const [mergeUrl, setMergeUrl] = useState(null);
+
   // Animate glow color phase while dragging
   useEffect(() => {
     if (!dragOver) return;
@@ -730,15 +746,90 @@ export default function Switcheroo() {
     });
   }, [files, statuses, convertImage]);
 
+  // ── PDF Merge ──────────────────────────────────────────────
+  const mergeAllToPdf = useCallback(async () => {
+    const mergeableFiles = files.filter(isMergeable);
+    if (mergeableFiles.length < 2) return;
+
+    setMergeStatus("merging");
+    if (mergeUrl) { URL.revokeObjectURL(mergeUrl); setMergeUrl(null); }
+
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      const mergedPdf = await PDFDocument.create();
+
+      for (const file of mergeableFiles) {
+        const type = detectType(file);
+
+        if (type === "application/pdf") {
+          // Extract all pages from existing PDF and add them
+          const pdfBytes = new Uint8Array(await file.arrayBuffer());
+          const srcPdf = await PDFDocument.load(pdfBytes);
+          const pages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
+          pages.forEach((p) => mergedPdf.addPage(p));
+        } else if (isHeic(type)) {
+          // Convert HEIC to JPEG first, then embed
+          try {
+            const { heicTo } = await import("heic-to");
+            const jpegBlob = await heicTo({ blob: file, type: "image/jpeg", quality: 0.92 });
+            const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+            const img = await mergedPdf.embedJpg(jpegBytes);
+            const page = mergedPdf.addPage([img.width, img.height]);
+            page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+          } catch (heicErr) {
+            console.warn("HEIC merge failed for", file.name, heicErr);
+          }
+        } else {
+          // Image: render to canvas, embed as JPEG page
+          try {
+            const bitmap = await createImageBitmap(file);
+            const canvas = document.createElement("canvas");
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(bitmap, 0, 0);
+            const jpegBlob = await new Promise((res) =>
+              canvas.toBlob((b) => res(b), "image/jpeg", 0.92)
+            );
+            const jpegBytes = new Uint8Array(await jpegBlob.arrayBuffer());
+            const img = await mergedPdf.embedJpg(jpegBytes);
+            const page = mergedPdf.addPage([img.width, img.height]);
+            page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+          } catch (imgErr) {
+            console.warn("Image merge failed for", file.name, imgErr);
+          }
+        }
+      }
+
+      const pdfBytes = await mergedPdf.save({ useObjectStreams: true });
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      setMergeUrl(url);
+      setMergeStatus("done");
+      triggerDownload(url, "switcheroo-merged.pdf");
+      setTotalConverted((c) => c + 1);
+    } catch (err) {
+      console.error("PDF merge failed:", err);
+      setMergeStatus("error");
+    }
+  }, [files, mergeUrl]);
+
   const clearAll = () => {
     Object.values(downloads).forEach(URL.revokeObjectURL);
+    if (mergeUrl) URL.revokeObjectURL(mergeUrl);
     setFiles([]); setStatuses({}); setDownloads({}); setTargets({});
+    setMergeStatus(null); setMergeUrl(null);
   };
 
   const pendingFiles = files.filter((f) => !statuses[f.name + f.lastModified]);
   const commonTargets = pendingFiles.length > 1
     ? [...new Set(pendingFiles.flatMap((f) => { const t = detectType(f); return FORMATS[t]?.targets || []; }))]
     : [];
+
+  // Count of files that can be merged into a PDF
+  const mergeableCount = files.filter(isMergeable).length;
 
   // Show share after 3+ conversions
   const showShare = totalConverted >= 3;
@@ -892,6 +983,93 @@ export default function Switcheroo() {
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* ── Merge to PDF ──────────────────────────────────────────── */}
+        {mergeableCount >= 2 && (
+          <div style={{
+            marginTop: 16, padding: "14px 20px", borderRadius: 16,
+            background: mergeStatus === "done"
+              ? "linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04))"
+              : mergeStatus === "error"
+              ? "rgba(254,242,242,0.8)"
+              : "rgba(255,255,255,0.7)",
+            backdropFilter: "blur(16px)",
+            boxShadow: "0 1px 8px rgba(0,0,0,0.03)",
+            border: mergeStatus === "done"
+              ? "1px solid rgba(16,185,129,0.2)"
+              : mergeStatus === "error"
+              ? "1px solid rgba(239,68,68,0.15)"
+              : "1px solid rgba(0,0,0,0.03)",
+            display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+            animation: "cardEnter 0.4s cubic-bezier(0.34,1.56,0.64,1) both",
+            transition: "all 0.3s ease",
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: mergeStatus === "done" ? "#059669" : mergeStatus === "error" ? "#ef4444" : "#1f2937" }}>
+                {mergeStatus === "done" ? "Merged!" : mergeStatus === "error" ? "Merge failed" : mergeStatus === "merging" ? "Merging..." : "Merge to PDF"}
+              </div>
+              <div style={{ fontSize: 12, color: mergeStatus === "done" ? "#10b981" : "#9ca3af", marginTop: 2 }}>
+                {mergeStatus === "done"
+                  ? `${mergeableCount} files combined into one PDF`
+                  : mergeStatus === "merging"
+                  ? `Combining ${mergeableCount} files...`
+                  : `Combine ${mergeableCount} files into a single PDF`}
+              </div>
+            </div>
+            {mergeStatus === "merging" ? (
+              <div style={{
+                padding: "8px 20px", borderRadius: 12,
+                background: "rgba(124,58,237,0.08)", color: "#7c3aed",
+                fontWeight: 700, fontSize: 13,
+                display: "flex", alignItems: "center", gap: 6,
+              }}>
+                <span style={{ display: "inline-block", animation: "spin 1s linear infinite", fontSize: 14 }}>&#9881;</span>
+                Merging
+              </div>
+            ) : mergeStatus === "done" ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => { if (mergeUrl) triggerDownload(mergeUrl, "switcheroo-merged.pdf"); }}
+                  style={{
+                    padding: "8px 18px", borderRadius: 12, border: "1.5px solid #d1d5db",
+                    background: "white", color: "#6b7280", fontWeight: 600, fontSize: 12,
+                    cursor: "pointer", transition: "all 0.2s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#10b981"; e.currentTarget.style.color = "#10b981"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.color = "#6b7280"; }}
+                >
+                  Re-download
+                </button>
+                <button onClick={() => { setMergeStatus(null); setMergeUrl(null); }}
+                  style={{
+                    padding: "8px 18px", borderRadius: 12, border: "none",
+                    background: "linear-gradient(135deg, #7c3aed, #7c3aedcc)",
+                    color: "white", fontWeight: 700, fontSize: 12, cursor: "pointer",
+                    transition: "transform 0.2s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "scale(1.06)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                >
+                  Re-merge
+                </button>
+              </div>
+            ) : (
+              <button onClick={mergeAllToPdf}
+                style={{
+                  padding: "8px 20px", borderRadius: 12, border: "none",
+                  background: "linear-gradient(135deg, #7c3aed, #7c3aedcc)",
+                  color: "white", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                  transition: "all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  boxShadow: "0 4px 14px rgba(124,58,237,0.2)",
+                  letterSpacing: "0.02em",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(124,58,237,0.3)"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(124,58,237,0.2)"; }}
+              >
+                Merge → PDF
+              </button>
+            )}
           </div>
         )}
 
