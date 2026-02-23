@@ -846,7 +846,7 @@ export default function Switcheroo() {
   const hasFiles = files.length > 0;
   let dropPadding;
   if (!hasFiles) {
-    dropPadding = "64px 32px";
+    dropPadding = "80px 40px";
   } else if (dragOver) {
     dropPadding = "56px 28px";
   } else {
@@ -858,11 +858,13 @@ export default function Switcheroo() {
       minHeight: "100vh",
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       position: "relative",
+      display: "flex", flexDirection: "column",
+      justifyContent: files.length === 0 ? "center" : "flex-start",
     }}>
       <MeshBackground />
       <WaterRipple active={ripple} originY={rippleY} />
 
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 580, margin: "0 auto", padding: "40px 20px 60px" }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 580, margin: "0 auto", padding: files.length === 0 ? "0 20px 80px" : "40px 20px 60px", width: "100%" }}>
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
@@ -925,18 +927,18 @@ export default function Switcheroo() {
                 minHeight: "1.6em",
               }}>
                 <span style={{
-                  fontSize: 18, fontWeight: 700, color: "#78716c",
+                  fontSize: 22, fontWeight: 700, color: "#78716c",
                   letterSpacing: "-0.01em",
                 }}>
                   {suggestion}
                 </span>
               </div>
-              <div style={{ fontSize: 13, color: "#b8b0a8", fontWeight: 500 }}>
+              <div style={{ fontSize: 15, color: "#b8b0a8", fontWeight: 500, marginTop: 4 }}>
                 {mobile
                   ? "Tap to choose files"
                   : "Drop files here or click to browse"}
               </div>
-              <div style={{ fontSize: 11, color: "#c4b5a4", marginTop: 8, letterSpacing: "0.03em" }}>
+              <div style={{ fontSize: 12, color: "#c4b5a4", marginTop: 10, letterSpacing: "0.03em" }}>
                 JPG {"\u00b7"} PNG {"\u00b7"} HEIC {"\u00b7"} WebP {"\u00b7"} AVIF {"\u00b7"} SVG {"\u00b7"} GIF {"\u00b7"} PDF
               </div>
             </>
