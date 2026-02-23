@@ -1,79 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fefce8"/>
-      <stop offset="25%" stop-color="#fdf2f8"/>
-      <stop offset="50%" stop-color="#f0f9ff"/>
-      <stop offset="75%" stop-color="#f5f3ff"/>
-      <stop offset="100%" stop-color="#ecfdf5"/>
-    </linearGradient>
-    <linearGradient id="txt" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="20%" stop-color="#ec4899"/>
-      <stop offset="40%" stop-color="#f59e0b"/>
-      <stop offset="60%" stop-color="#10b981"/>
-      <stop offset="80%" stop-color="#06b6d4"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
-    </linearGradient>
-    <linearGradient id="arrow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="25%" stop-color="#ec4899"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
-      <stop offset="75%" stop-color="#10b981"/>
-      <stop offset="100%" stop-color="#06b6d4"/>
+    <linearGradient id="title" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ec4899"/>
     </linearGradient>
   </defs>
 
-  <!-- Background -->
-  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- Clean warm background -->
+  <rect width="1200" height="630" fill="#FFFBF5"/>
 
-  <!-- Subtle mesh blobs -->
-  <ellipse cx="200" cy="150" rx="300" ry="200" fill="rgba(251,191,36,0.08)"/>
-  <ellipse cx="1000" cy="130" rx="250" ry="250" fill="rgba(236,72,153,0.06)"/>
-  <ellipse cx="700" cy="500" rx="350" ry="175" fill="rgba(59,130,246,0.06)"/>
-  <ellipse cx="100" cy="450" rx="200" ry="300" fill="rgba(16,185,129,0.07)"/>
-
-  <!-- Swap arrows icon (centered above text) -->
-  <g transform="translate(540, 120) scale(1.5)">
-    <path d="M18 26c0-6.6 5.4-12 12-12h4" stroke="url(#arrow)" stroke-width="5" stroke-linecap="round" fill="none"/>
-    <path d="M30 8l6 6-6 6" stroke="url(#arrow)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    <path d="M46 38c0 6.6-5.4 12-12 12h-4" stroke="url(#arrow)" stroke-width="5" stroke-linecap="round" fill="none"/>
-    <path d="M34 56l-6-6 6-6" stroke="url(#arrow)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  </g>
-
-  <!-- Title -->
-  <text x="600" y="340" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-weight="900" font-size="82" fill="url(#txt)">switcheroo</text>
+  <!-- Title — bigger, bolder, tighter -->
+  <text x="600" y="270" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="148" letter-spacing="-10" fill="url(#title)">switcheroo</text>
 
   <!-- Tagline -->
-  <text x="600" y="400" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-weight="500" font-size="28" fill="#78716c">the internet's most delightful file converter</text>
+  <text x="600" y="335" text-anchor="middle" font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="500" font-size="28" fill="#9ca3af">the internet's most delightful file converter</text>
 
-  <!-- Format pills -->
-  <g transform="translate(600, 460)" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="16">
-    <rect x="-340" y="-16" width="68" height="32" rx="16" fill="#7c3aed" opacity="0.12"/>
-    <text x="-306" y="6" fill="#7c3aed">HEIC</text>
-
-    <rect x="-255" y="-16" width="60" height="32" rx="16" fill="#f59e0b" opacity="0.12"/>
-    <text x="-225" y="6" fill="#f59e0b">JPG</text>
-
-    <rect x="-178" y="-16" width="62" height="32" rx="16" fill="#10b981" opacity="0.12"/>
-    <text x="-147" y="6" fill="#10b981">PNG</text>
-
-    <rect x="-98" y="-16" width="72" height="32" rx="16" fill="#06b6d4" opacity="0.12"/>
-    <text x="-62" y="6" fill="#06b6d4">WebP</text>
-
-    <rect x="-10" y="-16" width="56" height="32" rx="16" fill="#ec4899" opacity="0.12"/>
-    <text x="18" y="6" fill="#ec4899">GIF</text>
-
-    <rect x="62" y="-16" width="60" height="32" rx="16" fill="#f43f5e" opacity="0.12"/>
-    <text x="92" y="6" fill="#f43f5e">SVG</text>
-
-    <rect x="138" y="-16" width="66" height="32" rx="16" fill="#8b5cf6" opacity="0.12"/>
-    <text x="171" y="6" fill="#8b5cf6">AVIF</text>
-
-    <rect x="220" y="-16" width="60" height="32" rx="16" fill="#ef4444" opacity="0.12"/>
-    <text x="250" y="6" fill="#ef4444">PDF</text>
+  <!-- Format text — bold, colored -->
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="800" font-size="22">
+    <text x="130" y="425" fill="#7c3aed">HEIC</text>
+    <text x="235" y="425" fill="#e5e2de" font-size="16">·</text>
+    <text x="270" y="425" fill="#f59e0b">JPG</text>
+    <text x="360" y="425" fill="#e5e2de" font-size="16">·</text>
+    <text x="395" y="425" fill="#10b981">PNG</text>
+    <text x="490" y="425" fill="#e5e2de" font-size="16">·</text>
+    <text x="525" y="425" fill="#06b6d4">WebP</text>
+    <text x="635" y="425" fill="#e5e2de" font-size="16">·</text>
+    <text x="670" y="425" fill="#ec4899">GIF</text>
+    <text x="745" y="425" fill="#e5e2de" font-size="16">·</text>
+    <text x="780" y="425" fill="#f43f5e">SVG</text>
+    <text x="860" y="425" fill="#e5e2de" font-size="16">·</text>
+    <text x="895" y="425" fill="#8b5cf6">AVIF</text>
+    <text x="985" y="425" fill="#e5e2de" font-size="16">·</text>
+    <text x="1020" y="425" fill="#ef4444">PDF</text>
   </g>
 
-  <!-- URL -->
-  <text x="600" y="550" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-weight="600" font-size="22" fill="#a8a29e">switcheroo.cool</text>
 </svg>
