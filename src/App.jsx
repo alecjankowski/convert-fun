@@ -86,12 +86,12 @@ function isMergeable(file) {
 // Big, dramatic AirDrop-style impact. Two concentric ripple waves expand
 // outward with staggered timing. A generous shower of sparkle particles
 // bursts from the impact point and drifts outward like light on disturbed water.
-function WaterRipple({ active, originY }) {
+function WaterRipple({ trigger, originY }) {
   const [show, setShow] = useState(false);
   const [sparkles, setSparkles] = useState([]);
 
   useEffect(() => {
-    if (!active) return;
+    if (trigger === 0) return;
     setShow(true);
     // Generate sparkle particles — two rings: an inner burst and an outer drift
     const innerCount = 18;
@@ -125,7 +125,7 @@ function WaterRipple({ active, originY }) {
     setSparkles([...inner, ...outer]);
     const t = setTimeout(() => { setShow(false); setSparkles([]); }, 6000);
     return () => clearTimeout(t);
-  }, [active]);
+  }, [trigger]);
 
   if (!show && !sparkles.length) return null;
 
@@ -564,7 +564,7 @@ export default function Switcheroo() {
   const [downloads, setDownloads] = useState({});
   const [targets, setTargets] = useState({});
   const [dragOver, setDragOver] = useState(false);
-  const [ripple, setRipple] = useState(false);
+  const [rippleCount, setRippleCount] = useState(0);
   const [rippleY, setRippleY] = useState(0);
   const [plunk, setPlunk] = useState(false);
   const dropZoneRef = useRef(null);
@@ -636,11 +636,8 @@ export default function Switcheroo() {
         const rect = dropZoneRef.current.getBoundingClientRect();
         setRippleY(rect.top + rect.height / 2);
       }
-      setRipple(false);
+      setRippleCount((c) => c + 1);
       setPlunk(true);
-      // Force re-trigger by toggling off then on
-      requestAnimationFrame(() => setRipple(true));
-      setTimeout(() => setRipple(false), 50);
       setTimeout(() => setPlunk(false), 750);
       addFiles(e.dataTransfer.files);
     }
@@ -942,7 +939,7 @@ export default function Switcheroo() {
         justifyContent: "center",
       }}>
       <MeshBackground />
-      <WaterRipple active={ripple} originY={rippleY} />
+      <WaterRipple trigger={rippleCount} originY={rippleY} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 580, margin: "0 auto", padding: "0 20px 40px", width: "100%" }}>
 
