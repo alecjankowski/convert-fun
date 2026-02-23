@@ -229,7 +229,7 @@ function useRotatingSuggestion() {
         setIndex((i) => (i + 1) % CONVERSION_SUGGESTIONS.length);
         setFade(true);
       }, 350);
-    }, 3500);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
   return { suggestion: CONVERSION_SUGGESTIONS[index], fade };
