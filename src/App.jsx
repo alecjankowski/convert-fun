@@ -929,17 +929,22 @@ export default function Switcheroo() {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      position: "relative",
-      display: "flex", flexDirection: "column",
-      justifyContent: files.length === 0 ? "center" : "flex-start",
-    }}>
+    <div
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      style={{
+        minHeight: "100vh",
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        position: "relative",
+        display: "flex", flexDirection: "column",
+        justifyContent: "center",
+      }}>
       <MeshBackground />
       <WaterRipple active={ripple} originY={rippleY} />
 
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 580, margin: "0 auto", padding: files.length === 0 ? "0 20px 80px" : "40px 20px 60px", width: "100%" }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 580, margin: "0 auto", padding: "0 20px 40px", width: "100%" }}>
 
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
@@ -965,10 +970,6 @@ export default function Switcheroo() {
         {/* ── Drop Zone ───────────────────────────────────────────────── */}
         <div
           ref={dropZoneRef}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
           style={{
             borderRadius: 28,
@@ -1011,10 +1012,7 @@ export default function Switcheroo() {
               <div style={{ fontSize: 12, color: "#c4b5a4", marginTop: 10, letterSpacing: "0.03em" }}>
                 {mobile
                   ? "Tap to choose files"
-                  : "Drop files here or click to find \u2019em yourself"}
-              </div>
-              <div style={{ fontSize: 12, color: "#c4b5a4", marginTop: 6, letterSpacing: "0.03em" }}>
-                JPG {"\u00b7"} PNG {"\u00b7"} HEIC {"\u00b7"} WebP {"\u00b7"} AVIF {"\u00b7"} SVG {"\u00b7"} GIF {"\u00b7"} PDF
+                  : "Drop or click"} {"\u00b7"} JPG {"\u00b7"} PNG {"\u00b7"} HEIC {"\u00b7"} WebP {"\u00b7"} AVIF {"\u00b7"} SVG {"\u00b7"} GIF {"\u00b7"} PDF
               </div>
             </>
           ) : (
