@@ -1,5 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
+// ─── Analytics ──────────────────────────────────────────────────────────────
+function track(event, params) {
+  if (typeof window.gtag === "function") window.gtag("event", event, params);
+}
+
 // ─── Config ─────────────────────────────────────────────────────────────────
 const FORMATS = {
   "image/heic": { label: "HEIC", color: "#7c3aed", targets: ["JPG", "PNG"] },
@@ -78,9 +83,9 @@ function isMergeable(file) {
 }
 
 // ─── Water Ripple + Sparkles (behind the drop container) ─────────────────────
-// One slow, prominent deep-water ripple with subtle magic sparkles.
-// The ripple is a soft blurred gradient wash. The sparkles are tiny dots
-// that drift outward and fade, like light catching disturbed water.
+// Big, dramatic AirDrop-style impact. Two concentric ripple waves expand
+// outward with staggered timing. A generous shower of sparkle particles
+// bursts from the impact point and drifts outward like light on disturbed water.
 function WaterRipple({ active, originY }) {
   const [show, setShow] = useState(false);
   const [sparkles, setSparkles] = useState([]);
@@ -88,22 +93,37 @@ function WaterRipple({ active, originY }) {
   useEffect(() => {
     if (!active) return;
     setShow(true);
-    // Generate sparkle particles — small glinting dots that drift outward
-    const newSparkles = Array.from({ length: 14 }, (_, i) => {
-      const angle = (Math.PI * 2 * i) / 14 + (Math.random() - 0.5) * 0.4;
-      const dist = 80 + Math.random() * 180;
+    // Generate sparkle particles — two rings: an inner burst and an outer drift
+    const innerCount = 18;
+    const outerCount = 12;
+    const inner = Array.from({ length: innerCount }, (_, i) => {
+      const angle = (Math.PI * 2 * i) / innerCount + (Math.random() - 0.5) * 0.5;
+      const dist = 60 + Math.random() * 160;
       return {
         id: Date.now() + i,
         x: Math.cos(angle) * dist,
-        y: Math.sin(angle) * dist * 0.55, // flatter spread, like a surface
-        delay: Math.random() * 0.4,
-        duration: 1.2 + Math.random() * 1.0,
-        size: 2 + Math.random() * 3,
-        color: ["#c4b5fd", "#fbcfe8", "#a5f3fc", "#d9f99d", "#fde68a"][Math.floor(Math.random() * 5)],
+        y: Math.sin(angle) * dist * 0.5,
+        delay: Math.random() * 0.3,
+        duration: 1.0 + Math.random() * 0.8,
+        size: 3 + Math.random() * 4,
+        color: ["#c4b5fd", "#fbcfe8", "#a5f3fc", "#fde68a", "#f9a8d4", "#86efac"][Math.floor(Math.random() * 6)],
       };
     });
-    setSparkles(newSparkles);
-    const t = setTimeout(() => { setShow(false); setSparkles([]); }, 5500);
+    const outer = Array.from({ length: outerCount }, (_, i) => {
+      const angle = (Math.PI * 2 * i) / outerCount + (Math.random() - 0.5) * 0.6;
+      const dist = 200 + Math.random() * 260;
+      return {
+        id: Date.now() + innerCount + i,
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist * 0.45,
+        delay: 0.15 + Math.random() * 0.5,
+        duration: 1.4 + Math.random() * 1.2,
+        size: 2 + Math.random() * 3,
+        color: ["#c4b5fd", "#a5f3fc", "#d9f99d", "#fde68a", "#fca5a5"][Math.floor(Math.random() * 5)],
+      };
+    });
+    setSparkles([...inner, ...outer]);
+    const t = setTimeout(() => { setShow(false); setSparkles([]); }, 6000);
     return () => clearTimeout(t);
   }, [active]);
 
@@ -113,7 +133,7 @@ function WaterRipple({ active, originY }) {
     <div style={{
       position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden",
     }}>
-      {/* The single ripple wave */}
+      {/* Primary ripple wave — fast, vivid */}
       {show && (
         <div style={{
           position: "absolute",
@@ -122,20 +142,58 @@ function WaterRipple({ active, originY }) {
           width: 0, height: 0,
           borderRadius: "50%",
           transform: "translate(-50%, -50%)",
-          filter: "blur(45px)",
+          filter: "blur(40px)",
           background: `radial-gradient(
             ellipse at center,
             transparent 0%,
-            transparent 22%,
-            rgba(124, 58, 237, 0.10) 34%,
-            rgba(168, 120, 240, 0.13) 43%,
-            rgba(236, 72, 153, 0.10) 52%,
-            rgba(59, 130, 246, 0.07) 62%,
-            rgba(16, 185, 129, 0.05) 73%,
-            transparent 87%,
+            transparent 18%,
+            rgba(124, 58, 237, 0.18) 30%,
+            rgba(168, 120, 240, 0.22) 40%,
+            rgba(236, 72, 153, 0.16) 50%,
+            rgba(59, 130, 246, 0.10) 62%,
+            rgba(16, 185, 129, 0.06) 75%,
+            transparent 88%,
             transparent 100%
           )`,
-          animation: "waterRipple 5s cubic-bezier(0.12, 0.5, 0.25, 1) forwards",
+          animation: "waterRipple 4.5s cubic-bezier(0.08, 0.5, 0.25, 1) forwards",
+        }} />
+      )}
+      {/* Secondary ripple wave — slower, softer, staggered */}
+      {show && (
+        <div style={{
+          position: "absolute",
+          left: "50%",
+          top: originY,
+          width: 0, height: 0,
+          borderRadius: "50%",
+          transform: "translate(-50%, -50%)",
+          filter: "blur(60px)",
+          background: `radial-gradient(
+            ellipse at center,
+            transparent 0%,
+            transparent 25%,
+            rgba(236, 72, 153, 0.10) 38%,
+            rgba(124, 58, 237, 0.12) 48%,
+            rgba(6, 182, 212, 0.08) 60%,
+            rgba(245, 158, 11, 0.05) 72%,
+            transparent 85%,
+            transparent 100%
+          )`,
+          animation: "waterRipple2 5.5s cubic-bezier(0.08, 0.5, 0.25, 1) 0.2s forwards",
+          opacity: 0,
+        }} />
+      )}
+      {/* Central flash — brief bright spot at impact */}
+      {show && (
+        <div style={{
+          position: "absolute",
+          left: "50%",
+          top: originY,
+          width: 120, height: 120,
+          borderRadius: "50%",
+          transform: "translate(-50%, -50%)",
+          background: "radial-gradient(circle, rgba(255,255,255,0.6) 0%, rgba(196,181,253,0.3) 30%, transparent 70%)",
+          animation: "impactFlash 0.6s ease-out forwards",
         }} />
       )}
       {/* Sparkle particles */}
@@ -148,7 +206,7 @@ function WaterRipple({ active, originY }) {
           height: s.size,
           borderRadius: "50%",
           background: s.color,
-          boxShadow: `0 0 ${s.size + 2}px ${s.color}`,
+          boxShadow: `0 0 ${s.size + 4}px ${s.color}, 0 0 ${s.size + 8}px ${s.color}44`,
           opacity: 0,
           transform: "translate(-50%, -50%)",
           animation: `sparkle ${s.duration}s ${s.delay}s ease-out forwards`,
@@ -245,12 +303,14 @@ function ShareMoment({ visible }) {
     if (navigator.share) {
       try {
         await navigator.share({ title: "switcheroo", text: "hi, i'm the internet's most delightful file converter. what do you wanna switch?", url: "https://switcheroo.cool" });
+        track("share", { method: "native" });
       } catch {}
     } else {
       try {
         await navigator.clipboard.writeText("https://switcheroo.cool");
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+        track("share", { method: "clipboard" });
       } catch {}
     }
   }, []);
@@ -415,15 +475,19 @@ function FileCard({ file, onConvert, onRemove, status, downloadUrl, targetFormat
                   onMouseEnter={() => setHoveredBtn(t)}
                   onMouseLeave={() => setHoveredBtn(null)}
                   style={{
-                    padding: "6px 14px", borderRadius: 10,
-                    border: `1.5px solid ${isHovered ? tm.color : "#e5e7eb"}`,
-                    background: isHovered ? `${tm.color}08` : "white",
-                    color: isHovered ? tm.color : "#9ca3af",
-                    fontWeight: 600, fontSize: 12, cursor: "pointer",
-                    transition: "all 0.25s ease",
+                    padding: "6px 16px", borderRadius: 10, border: "none",
+                    background: isHovered
+                      ? `linear-gradient(135deg, ${tm.color}, ${tm.color}bb)`
+                      : `linear-gradient(135deg, ${tm.color}15, ${tm.color}08)`,
+                    color: isHovered ? "white" : tm.color,
+                    fontWeight: 700, fontSize: 12, cursor: "pointer",
+                    transition: "all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                    transform: isHovered ? "scale(1.08)" : "scale(1)",
+                    boxShadow: isHovered ? `0 6px 20px ${tm.color}33` : "none",
+                    letterSpacing: "0.02em",
                   }}
                 >
-                  Also {tm.btnLabel}
+                  {tm.btnLabel}
                 </button>
               );
             })}
@@ -529,7 +593,12 @@ export default function Switcheroo() {
   }, [dragOver]);
 
   const addFiles = useCallback((newFiles) => {
-    setFiles((prev) => [...prev, ...Array.from(newFiles)]);
+    const arr = Array.from(newFiles);
+    setFiles((prev) => [...prev, ...arr]);
+    arr.forEach((f) => {
+      const label = FORMATS[detectType(f)]?.label || "unsupported";
+      track("file_added", { format: label });
+    });
   }, []);
 
   const removeFile = useCallback((fileToRemove) => {
@@ -572,7 +641,7 @@ export default function Switcheroo() {
       // Force re-trigger by toggling off then on
       requestAnimationFrame(() => setRipple(true));
       setTimeout(() => setRipple(false), 50);
-      setTimeout(() => setPlunk(false), 600);
+      setTimeout(() => setPlunk(false), 750);
       addFiles(e.dataTransfer.files);
     }
   }, [addFiles]);
@@ -703,6 +772,7 @@ export default function Switcheroo() {
             setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(converted) }));
             setStatuses((s) => ({ ...s, [key]: "done" }));
             setTotalConverted((c) => c + 1);
+            track("file_converted", { source_format: "HEIC", target_format: targetFormat });
             return;
           } catch (heicErr) {
             console.error("heic-to failed:", heicErr);
@@ -729,9 +799,12 @@ export default function Switcheroo() {
 
       setStatuses((s) => ({ ...s, [key]: "done" }));
       setTotalConverted((c) => c + 1);
+      const srcLabel = FORMATS[detectType(file)]?.label || "unknown";
+      track("file_converted", { source_format: srcLabel, target_format: targetFormat });
     } catch (err) {
       console.error(err);
       setStatuses((s) => ({ ...s, [key]: "error" }));
+      track("conversion_error", { source_format: FORMATS[detectType(file)]?.label || "unknown", target_format: targetFormat });
     }
   }, []);
 
@@ -810,9 +883,11 @@ export default function Switcheroo() {
       setMergeStatus("done");
       triggerDownload(url, "switcheroo-merged.pdf");
       setTotalConverted((c) => c + 1);
+      track("pdf_merged", { file_count: mergeableFiles.length });
     } catch (err) {
       console.error("PDF merge failed:", err);
       setMergeStatus("error");
+      track("merge_error", { file_count: mergeableFiles.length });
     }
   }, [files, mergeUrl]);
 
@@ -905,7 +980,7 @@ export default function Switcheroo() {
             cursor: "pointer",
             transition: plunk ? "none" : "all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
             transform: dragOver ? "scale(1.02)" : "scale(1)",
-            animation: plunk ? "dropPlunk 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : "none",
+            animation: plunk ? "dropPlunk 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : "none",
             boxShadow: glowShadow,
             textAlign: "center",
             border: dragOver ? "1.5px solid rgba(255,255,255,0.6)" : "1px solid rgba(0,0,0,0.04)",
@@ -933,12 +1008,12 @@ export default function Switcheroo() {
                   {suggestion}
                 </span>
               </div>
-              <div style={{ fontSize: 15, color: "#b8b0a8", fontWeight: 500, marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: "#c4b5a4", marginTop: 10, letterSpacing: "0.03em" }}>
                 {mobile
                   ? "Tap to choose files"
-                  : "Drop files here or click to browse"}
+                  : "Drop files here or click to find \u2019em yourself"}
               </div>
-              <div style={{ fontSize: 12, color: "#c4b5a4", marginTop: 10, letterSpacing: "0.03em" }}>
+              <div style={{ fontSize: 12, color: "#c4b5a4", marginTop: 6, letterSpacing: "0.03em" }}>
                 JPG {"\u00b7"} PNG {"\u00b7"} HEIC {"\u00b7"} WebP {"\u00b7"} AVIF {"\u00b7"} SVG {"\u00b7"} GIF {"\u00b7"} PDF
               </div>
             </>
@@ -1069,7 +1144,7 @@ export default function Switcheroo() {
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(124,58,237,0.3)"; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(124,58,237,0.2)"; }}
               >
-                Merge → PDF
+                Merge &rarr; PDF
               </button>
             )}
           </div>
@@ -1171,21 +1246,59 @@ export default function Switcheroo() {
             height: 0;
             opacity: 0;
           }
-          5% {
+          4% {
+            opacity: 0.9;
+          }
+          25% {
+            opacity: 1;
+          }
+          55% {
+            opacity: 0.6;
+          }
+          80% {
+            opacity: 0.15;
+          }
+          100% {
+            width: 280vmax;
+            height: 280vmax;
+            opacity: 0;
+          }
+        }
+        @keyframes waterRipple2 {
+          0% {
+            width: 0;
+            height: 0;
+            opacity: 0;
+          }
+          6% {
             opacity: 0.7;
           }
           30% {
-            opacity: 1;
+            opacity: 0.8;
           }
           60% {
-            opacity: 0.6;
+            opacity: 0.4;
           }
           85% {
-            opacity: 0.2;
+            opacity: 0.1;
           }
           100% {
-            width: 250vmax;
-            height: 250vmax;
+            width: 320vmax;
+            height: 320vmax;
+            opacity: 0;
+          }
+        }
+        @keyframes impactFlash {
+          0% {
+            transform: translate(-50%, -50%) scale(0.2);
+            opacity: 1;
+          }
+          30% {
+            transform: translate(-50%, -50%) scale(1.8);
+            opacity: 0.7;
+          }
+          100% {
+            transform: translate(-50%, -50%) scale(3);
             opacity: 0;
           }
         }
@@ -1194,31 +1307,34 @@ export default function Switcheroo() {
             opacity: 0;
             transform: translate(-50%, -50%) translate(0px, 0px) scale(0);
           }
-          15% {
+          12% {
             opacity: 1;
-            transform: translate(-50%, -50%) translate(calc(var(--sx) * 0.3), calc(var(--sy) * 0.3)) scale(1.2);
+            transform: translate(-50%, -50%) translate(calc(var(--sx) * 0.25), calc(var(--sy) * 0.25)) scale(1.4);
           }
-          50% {
-            opacity: 0.8;
-            transform: translate(-50%, -50%) translate(calc(var(--sx) * 0.7), calc(var(--sy) * 0.7)) scale(1);
+          40% {
+            opacity: 0.9;
+            transform: translate(-50%, -50%) translate(calc(var(--sx) * 0.65), calc(var(--sy) * 0.65)) scale(1);
           }
           100% {
             opacity: 0;
-            transform: translate(-50%, -50%) translate(var(--sx), var(--sy)) scale(0.3);
+            transform: translate(-50%, -50%) translate(var(--sx), var(--sy)) scale(0.2);
           }
         }
         @keyframes dropPlunk {
           0% {
-            transform: scale(1.02);
+            transform: scale(1.03);
           }
-          20% {
-            transform: scale(0.95) translateY(4px);
+          15% {
+            transform: scale(0.92) translateY(6px);
           }
-          50% {
-            transform: scale(1.03) translateY(-2px);
+          35% {
+            transform: scale(1.06) translateY(-4px);
+          }
+          55% {
+            transform: scale(0.97) translateY(2px);
           }
           75% {
-            transform: scale(0.99);
+            transform: scale(1.02) translateY(-1px);
           }
           100% {
             transform: scale(1);
