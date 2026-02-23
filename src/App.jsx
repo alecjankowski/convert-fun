@@ -950,7 +950,7 @@ export default function Switcheroo() {
             fontSize: 13, color: "#a8a29e", marginTop: 8, fontWeight: 500,
             letterSpacing: "0.01em",
           }}>
-            100% browser-based. Your files never leave your device.
+            100% browser-based file converter. Your files never leave your device.
           </p>
           {totalConverted > 0 && (
             <div style={{
