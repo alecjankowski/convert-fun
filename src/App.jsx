@@ -176,16 +176,28 @@ function MeshBackground() {
   );
 }
 
+// ─── Color Pairs ─────────────────────────────────────────────────────────────
+// Each visit gets a random duo. Neon, fun, two colors at a time.
+const COLOR_PAIRS = [
+  ["#0d9488", "#84cc16"], // dark teal → lime
+  ["#f97316", "#ec4899"], // orange → hot pink
+  ["#3b82f6", "#8b5cf6"], // electric blue → violet
+  ["#06b6d4", "#facc15"], // cyan → yellow
+  ["#e11d48", "#fb923c"], // rose → tangerine
+  ["#8b5cf6", "#22d3ee"], // violet → aqua
+];
+const chosenPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
+
 // ─── Logo ───────────────────────────────────────────────────────────────────
 function Logo() {
   return (
     <a href="/" style={{ textDecoration: "none" }}>
       <h1 style={{
         fontSize: 56, fontWeight: 900, margin: 0, letterSpacing: "-0.04em",
-        background: "linear-gradient(135deg, #7c3aed, #ec4899, #f59e0b, #10b981, #06b6d4, #7c3aed)",
+        background: `linear-gradient(135deg, ${chosenPair[0]}, ${chosenPair[1]}, ${chosenPair[0]})`,
         WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        backgroundSize: "300% 300%",
-        animation: "gradientShift 8s ease infinite",
+        backgroundSize: "200% 200%",
+        animation: "gradientShift 6s ease infinite",
         cursor: "pointer", lineHeight: 1.1, userSelect: "none",
       }}>
         switcheroo
@@ -743,7 +755,7 @@ export default function Switcheroo() {
   const hasFiles = files.length > 0;
   let dropPadding;
   if (!hasFiles) {
-    dropPadding = "100px 32px";
+    dropPadding = "64px 32px";
   } else if (dragOver) {
     dropPadding = "56px 28px";
   } else {
@@ -759,14 +771,20 @@ export default function Switcheroo() {
       <MeshBackground />
       <WaterRipple active={ripple} originY={rippleY} />
 
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 680, margin: "0 auto", padding: "48px 20px 80px" }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 580, margin: "0 auto", padding: "40px 20px 60px" }}>
 
         {/* ── Header ──────────────────────────────────────────────────── */}
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
           <Logo />
+          <p style={{
+            fontSize: 13, color: "#a8a29e", marginTop: 8, fontWeight: 500,
+            letterSpacing: "0.01em",
+          }}>
+            100% browser-based. Your files never leave your device.
+          </p>
           {totalConverted > 0 && (
             <div style={{
-              display: "inline-block", marginTop: 14, padding: "5px 14px", borderRadius: 100,
+              display: "inline-block", marginTop: 12, padding: "5px 14px", borderRadius: 100,
               background: "linear-gradient(135deg, #10b981, #059669)", color: "white",
               fontSize: 13, fontWeight: 700, animation: "popIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both",
               letterSpacing: "0.01em",
@@ -801,7 +819,7 @@ export default function Switcheroo() {
           }}
         >
           <input ref={inputRef} type="file" multiple
-            accept="image/*,.pdf,.heic,.heif,.webp,.avif"
+            accept="image/*,image/heic,image/heif,.heic,.heif,.pdf,.webp,.avif,.jpg,.jpeg,.png,.gif,.svg"
             onChange={(e) => { if (e.target.files.length) addFiles(e.target.files); e.target.value = ""; }}
             style={{ display: "none" }}
           />
@@ -809,23 +827,26 @@ export default function Switcheroo() {
           {files.length === 0 ? (
             <>
               <div style={{
-                marginBottom: 10,
+                marginBottom: 6,
                 opacity: fade ? 1 : 0,
                 transform: fade ? "translateY(0)" : "translateY(4px)",
                 transition: "all 0.35s ease",
-                minHeight: "1.4em",
+                minHeight: "1.6em",
               }}>
                 <span style={{
-                  fontSize: 15, fontWeight: 500, color: "#c4b5a4",
-                  fontStyle: "italic", letterSpacing: "0.01em",
+                  fontSize: 18, fontWeight: 700, color: "#78716c",
+                  letterSpacing: "-0.01em",
                 }}>
                   {suggestion}
                 </span>
               </div>
-              <div style={{ fontSize: 13, color: "#a8a29e" }}>
+              <div style={{ fontSize: 13, color: "#b8b0a8", fontWeight: 500 }}>
                 {mobile
                   ? "Tap to choose files"
-                  : "JPG \u00b7 PNG \u00b7 HEIC \u00b7 WebP \u00b7 AVIF \u00b7 SVG \u00b7 GIF \u00b7 PDF"}
+                  : "Drop files here or click to browse"}
+              </div>
+              <div style={{ fontSize: 11, color: "#c4b5a4", marginTop: 8, letterSpacing: "0.03em" }}>
+                JPG {"\u00b7"} PNG {"\u00b7"} HEIC {"\u00b7"} WebP {"\u00b7"} AVIF {"\u00b7"} SVG {"\u00b7"} GIF {"\u00b7"} PDF
               </div>
             </>
           ) : (
@@ -914,10 +935,7 @@ export default function Switcheroo() {
         )}
 
         {/* ── Footer ──────────────────────────────────────────────────── */}
-        <div style={{ textAlign: "center", marginTop: 48 }}>
-          <div style={{ fontSize: 12, color: "#c4b5a4", letterSpacing: "0.02em" }}>
-            100% browser-based. Your files never leave your device.
-          </div>
+        <div style={{ textAlign: "center", marginTop: 40 }}>
           <ShareMoment visible={showShare} />
         </div>
       </div>
