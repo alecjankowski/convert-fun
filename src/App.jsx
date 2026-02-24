@@ -218,51 +218,18 @@ function WaterRipple({ trigger, originY }) {
   );
 }
 
-// ─── Motion Permissions (iOS requires user gesture) ─────────────────────────
-// iOS 13+ blocks gyroscope + accelerometer unless you request permission
-// from inside a click/tap handler. This module batches both requests into
-// a single tap, then broadcasts to any listeners waiting for access.
-const motionPermissions = {
-  _granted: false,
-  _requested: false,
-  _listeners: [],
-  // Call this from a click/tap handler
-  async request() {
-    if (this._granted || this._requested) return;
-    this._requested = true;
-    const needsOrientation = typeof DeviceOrientationEvent !== "undefined"
-      && typeof DeviceOrientationEvent.requestPermission === "function";
-    const needsMotion = typeof DeviceMotionEvent !== "undefined"
-      && typeof DeviceMotionEvent.requestPermission === "function";
-    try {
-      if (needsOrientation) {
-        const p = await DeviceOrientationEvent.requestPermission();
-        if (p !== "granted") return;
-      }
-      if (needsMotion) {
-        const p = await DeviceMotionEvent.requestPermission();
-        if (p !== "granted") return;
-      }
-      this._granted = true;
-      this._listeners.forEach((fn) => fn());
-      this._listeners = [];
-    } catch {}
-  },
-  // Subscribe — callback fires immediately if already granted, or queues
-  onGranted(fn) {
-    if (this._granted) { fn(); return; }
-    this._listeners.push(fn);
-  },
-  // Does this browser even need permission? (false on Android / desktop)
-  get needsRequest() {
-    return (typeof DeviceOrientationEvent !== "undefined"
-      && typeof DeviceOrientationEvent.requestPermission === "function");
-  },
-};
+// ─── Motion Helpers ──────────────────────────────────────────────────────────
+// Gyroscope + shake work automatically on Android (no permission needed).
+// On iOS 13+ they require a permission prompt, which feels spammy for a file
+// converter — so we just skip motion features on iOS. Zero friction.
+function needsMotionPermission() {
+  return (typeof DeviceOrientationEvent !== "undefined"
+    && typeof DeviceOrientationEvent.requestPermission === "function");
+}
 
 // ─── Gyroscope Hook ─────────────────────────────────────────────────────────
 // Reads device orientation and returns smoothed tilt values (−1 to 1).
-// Falls back to { x: 0, y: 0 } on desktop / permission denied.
+// Falls back to { x: 0, y: 0 } on desktop / iOS / permission denied.
 function useGyroscope() {
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const smoothRef = useRef({ x: 0, y: 0 });
@@ -270,7 +237,7 @@ function useGyroscope() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isMob = /iPhone|iPad|iPod|Android/i.test(navigator?.userAgent || "");
-    if (!isMob) return;
+    if (!isMob || needsMotionPermission()) return; // skip iOS entirely
 
     let active = true;
     let frame;
@@ -290,17 +257,8 @@ function useGyroscope() {
       frame = requestAnimationFrame(tick);
     };
 
-    const startListening = () => {
-      window.addEventListener("deviceorientation", handleOrientation);
-      frame = requestAnimationFrame(tick);
-    };
-
-    // If browser needs permission, wait for it; otherwise start immediately
-    if (motionPermissions.needsRequest) {
-      motionPermissions.onGranted(startListening);
-    } else {
-      startListening();
-    }
+    window.addEventListener("deviceorientation", handleOrientation);
+    frame = requestAnimationFrame(tick);
 
     return () => {
       active = false;
@@ -313,7 +271,7 @@ function useGyroscope() {
 }
 
 // ─── Shake Detection Hook ───────────────────────────────────────────────────
-// Detects phone shake gestures and calls the callback.
+// Detects phone shake gestures and calls the callback. Android only.
 function useShakeDetection(onShake) {
   const lastAccel = useRef({ x: 0, y: 0, z: 0 });
   const shakeTimeout = useRef(null);
@@ -323,7 +281,7 @@ function useShakeDetection(onShake) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isMob = /iPhone|iPad|iPod|Android/i.test(navigator?.userAgent || "");
-    if (!isMob) return;
+    if (!isMob || needsMotionPermission()) return; // skip iOS entirely
 
     const SHAKE_THRESHOLD = 25;
     let lastTime = 0;
@@ -347,15 +305,7 @@ function useShakeDetection(onShake) {
       }
     };
 
-    const startListening = () => {
-      window.addEventListener("devicemotion", handleMotion);
-    };
-
-    if (motionPermissions.needsRequest) {
-      motionPermissions.onGranted(startListening);
-    } else {
-      startListening();
-    }
+    window.addEventListener("devicemotion", handleMotion);
 
     return () => {
       window.removeEventListener("devicemotion", handleMotion);
@@ -365,7 +315,7 @@ function useShakeDetection(onShake) {
 }
 
 // ─── Haptics Helper ─────────────────────────────────────────────────────────
-// Fires a short vibration. No-op on devices that don't support it.
+// Fires a short vibration. No-op on iOS and devices that don't support it.
 function haptic(pattern = 15) {
   try { navigator?.vibrate?.(pattern); } catch {}
 }
@@ -1172,7 +1122,7 @@ export default function Switcheroo() {
         {/* ── Drop Zone ───────────────────────────────────────────────── */}
         <div
           ref={dropZoneRef}
-          onClick={() => { motionPermissions.request(); inputRef.current?.click(); }}
+          onClick={() => inputRef.current?.click()}
           style={{
             borderRadius: 28,
             padding: dropPadding,
