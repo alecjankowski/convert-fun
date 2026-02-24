@@ -320,11 +320,36 @@ function haptic(pattern = 15) {
   try { navigator?.vibrate?.(pattern); } catch {}
 }
 
+// ─── Touch Ripple ───────────────────────────────────────────────────────────
+// Spawns a color ripple at the exact touch position inside the drop zone.
+// Each tap creates a new ripple that expands and fades — they can overlap.
+function TouchRipple({ ripples }) {
+  if (!ripples.length) return null;
+  return (
+    <>
+      {ripples.map((r) => (
+        <div key={r.id} style={{
+          position: "absolute",
+          left: r.x, top: r.y,
+          width: 0, height: 0,
+          borderRadius: "50%",
+          transform: "translate(-50%, -50%)",
+          background: `radial-gradient(circle, ${r.color}30 0%, ${r.color}10 40%, transparent 70%)`,
+          animation: "touchRipple 0.8s cubic-bezier(0.08, 0.5, 0.25, 1) forwards",
+          pointerEvents: "none",
+        }} />
+      ))}
+    </>
+  );
+}
+
 // ─── Mesh Background ────────────────────────────────────────────────────────
-function MeshBackground({ tilt }) {
+function MeshBackground({ tilt, isMobile }) {
   // Shift gradient blob positions based on gyroscope tilt
-  const offsetX = tilt.x * 6; // percent shift
+  const offsetX = tilt.x * 6;
   const offsetY = tilt.y * 4;
+  // Stronger colors on mobile — the smaller screen can handle more saturation
+  const m = isMobile ? 1.8 : 1;
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 0, overflow: "hidden" }}>
       <div style={{
@@ -334,11 +359,11 @@ function MeshBackground({ tilt }) {
       <div style={{
         position: "absolute", inset: "-20%",
         background: `
-          radial-gradient(ellipse 600px 400px at ${20 + offsetX}% ${30 + offsetY}%, rgba(251,191,36,0.12) 0%, transparent 70%),
-          radial-gradient(ellipse 500px 500px at ${80 - offsetX}% ${20 + offsetY}%, rgba(236,72,153,0.10) 0%, transparent 70%),
-          radial-gradient(ellipse 700px 350px at ${60 + offsetX * 0.7}% ${80 - offsetY}%, rgba(59,130,246,0.09) 0%, transparent 70%),
-          radial-gradient(ellipse 400px 600px at ${10 - offsetX * 0.5}% ${70 + offsetY * 0.8}%, rgba(16,185,129,0.10) 0%, transparent 70%),
-          radial-gradient(ellipse 500px 400px at ${90 + offsetX}% ${60 - offsetY * 0.6}%, rgba(139,92,246,0.08) 0%, transparent 70%)
+          radial-gradient(ellipse 600px 400px at ${20 + offsetX}% ${30 + offsetY}%, rgba(251,191,36,${(0.12 * m).toFixed(2)}) 0%, transparent 70%),
+          radial-gradient(ellipse 500px 500px at ${80 - offsetX}% ${20 + offsetY}%, rgba(236,72,153,${(0.10 * m).toFixed(2)}) 0%, transparent 70%),
+          radial-gradient(ellipse 700px 350px at ${60 + offsetX * 0.7}% ${80 - offsetY}%, rgba(59,130,246,${(0.09 * m).toFixed(2)}) 0%, transparent 70%),
+          radial-gradient(ellipse 400px 600px at ${10 - offsetX * 0.5}% ${70 + offsetY * 0.8}%, rgba(16,185,129,${(0.10 * m).toFixed(2)}) 0%, transparent 70%),
+          radial-gradient(ellipse 500px 400px at ${90 + offsetX}% ${60 - offsetY * 0.6}%, rgba(139,92,246,${(0.08 * m).toFixed(2)}) 0%, transparent 70%)
         `,
         transition: "background 0.15s ease-out",
         animation: "meshDrift 25s ease-in-out infinite alternate",
@@ -714,6 +739,26 @@ export default function Switcheroo() {
   const dragCountRef = useRef(0);
   const { suggestion, fade } = useRotatingSuggestion();
   const gyroTilt = useGyroscope();
+
+  // ── Touch ripple state (mobile) ──
+  const [touchRipples, setTouchRipples] = useState([]);
+  const rippleIdRef = useRef(0);
+
+  const spawnTouchRipple = useCallback((e) => {
+    if (!mobile) return;
+    const rect = dropZoneRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    // Accept both touch and pointer events
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const colors = [chosenPair[0], chosenPair[1], "#8b5cf6", "#06b6d4", "#f59e0b", "#ec4899"];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const id = ++rippleIdRef.current;
+    setTouchRipples((prev) => [...prev, { id, x, y, color }]);
+    setTimeout(() => setTouchRipples((prev) => prev.filter((r) => r.id !== id)), 900);
+  }, [mobile]);
 
   // ── Shake to clear (mobile only) ──
   const [shakeExit, setShakeExit] = useState(false);
@@ -1093,7 +1138,7 @@ export default function Switcheroo() {
         display: "flex", flexDirection: "column",
         justifyContent: "center",
       }}>
-      <MeshBackground tilt={gyroTilt} />
+      <MeshBackground tilt={gyroTilt} isMobile={mobile} />
       <WaterRipple trigger={rippleCount} originY={rippleY} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 580, margin: "0 auto", padding: "0 20px 40px", width: "100%" }}>
@@ -1123,7 +1168,9 @@ export default function Switcheroo() {
         <div
           ref={dropZoneRef}
           onClick={() => inputRef.current?.click()}
+          onPointerDown={spawnTouchRipple}
           style={{
+            position: "relative", overflow: "hidden",
             borderRadius: 28,
             padding: dropPadding,
             background: dragOver
@@ -1139,6 +1186,7 @@ export default function Switcheroo() {
             border: dragOver ? "1.5px solid rgba(255,255,255,0.6)" : "1px solid rgba(0,0,0,0.04)",
           }}
         >
+          <TouchRipple ripples={touchRipples} />
           <input ref={inputRef} type="file" multiple
             accept="image/*,image/heic,image/heif,.heic,.heif,.pdf,.webp,.avif,.jpg,.jpeg,.png,.gif,.svg"
             onChange={(e) => { if (e.target.files.length) addFiles(e.target.files); e.target.value = ""; }}
@@ -1166,6 +1214,21 @@ export default function Switcheroo() {
                   ? "Tap to choose files"
                   : "Drop or click"} {"\u00b7"} JPG {"\u00b7"} PNG {"\u00b7"} HEIC {"\u00b7"} WebP {"\u00b7"} AVIF {"\u00b7"} SVG {"\u00b7"} GIF {"\u00b7"} PDF
               </div>
+              {mobile && (
+                <div style={{
+                  marginTop: 14, fontSize: 11, color: "#d6cfc4",
+                  animation: "fadeInUp 1.2s ease both",
+                  animationDelay: "2s",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                }}>
+                  <span style={{
+                    display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+                    background: `linear-gradient(135deg, ${chosenPair[0]}66, ${chosenPair[1]}66)`,
+                    animation: "touchCuePulse 2s ease-in-out infinite",
+                  }} />
+                  tap anywhere for a surprise
+                </div>
+              )}
             </>
           ) : (
             <div style={{
@@ -1494,6 +1557,25 @@ export default function Switcheroo() {
           100% {
             transform: scale(1);
           }
+        }
+        @keyframes touchRipple {
+          0% {
+            width: 0;
+            height: 0;
+            opacity: 0.6;
+          }
+          40% {
+            opacity: 0.3;
+          }
+          100% {
+            width: 280px;
+            height: 280px;
+            opacity: 0;
+          }
+        }
+        @keyframes touchCuePulse {
+          0%, 100% { opacity: 0.4; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.6); }
         }
         @keyframes shakeTumble {
           0% {
