@@ -218,6 +218,48 @@ function WaterRipple({ trigger, originY }) {
   );
 }
 
+// ─── Motion Permissions (iOS requires user gesture) ─────────────────────────
+// iOS 13+ blocks gyroscope + accelerometer unless you request permission
+// from inside a click/tap handler. This module batches both requests into
+// a single tap, then broadcasts to any listeners waiting for access.
+const motionPermissions = {
+  _granted: false,
+  _requested: false,
+  _listeners: [],
+  // Call this from a click/tap handler
+  async request() {
+    if (this._granted || this._requested) return;
+    this._requested = true;
+    const needsOrientation = typeof DeviceOrientationEvent !== "undefined"
+      && typeof DeviceOrientationEvent.requestPermission === "function";
+    const needsMotion = typeof DeviceMotionEvent !== "undefined"
+      && typeof DeviceMotionEvent.requestPermission === "function";
+    try {
+      if (needsOrientation) {
+        const p = await DeviceOrientationEvent.requestPermission();
+        if (p !== "granted") return;
+      }
+      if (needsMotion) {
+        const p = await DeviceMotionEvent.requestPermission();
+        if (p !== "granted") return;
+      }
+      this._granted = true;
+      this._listeners.forEach((fn) => fn());
+      this._listeners = [];
+    } catch {}
+  },
+  // Subscribe — callback fires immediately if already granted, or queues
+  onGranted(fn) {
+    if (this._granted) { fn(); return; }
+    this._listeners.push(fn);
+  },
+  // Does this browser even need permission? (false on Android / desktop)
+  get needsRequest() {
+    return (typeof DeviceOrientationEvent !== "undefined"
+      && typeof DeviceOrientationEvent.requestPermission === "function");
+  },
+};
+
 // ─── Gyroscope Hook ─────────────────────────────────────────────────────────
 // Reads device orientation and returns smoothed tilt values (−1 to 1).
 // Falls back to { x: 0, y: 0 } on desktop / permission denied.
@@ -234,7 +276,6 @@ function useGyroscope() {
     let frame;
 
     const handleOrientation = (e) => {
-      // gamma = left/right tilt (−90 to 90), beta = front/back (−180 to 180)
       const rawX = Math.max(-1, Math.min(1, (e.gamma || 0) / 35));
       const rawY = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 35));
       smoothRef.current = { x: rawX, y: rawY };
@@ -254,11 +295,9 @@ function useGyroscope() {
       frame = requestAnimationFrame(tick);
     };
 
-    // iOS 13+ requires permission
-    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
-      DeviceOrientationEvent.requestPermission()
-        .then((perm) => { if (perm === "granted") startListening(); })
-        .catch(() => {});
+    // If browser needs permission, wait for it; otherwise start immediately
+    if (motionPermissions.needsRequest) {
+      motionPermissions.onGranted(startListening);
     } else {
       startListening();
     }
@@ -293,7 +332,7 @@ function useShakeDetection(onShake) {
       const accel = e.accelerationIncludingGravity;
       if (!accel) return;
       const now = Date.now();
-      if (now - lastTime < 100) return; // throttle to 10fps
+      if (now - lastTime < 100) return;
       const dx = Math.abs(accel.x - lastAccel.current.x);
       const dy = Math.abs(accel.y - lastAccel.current.y);
       const dz = Math.abs(accel.z - lastAccel.current.z);
@@ -303,7 +342,6 @@ function useShakeDetection(onShake) {
       if (dx + dy + dz > SHAKE_THRESHOLD) {
         if (!shakeTimeout.current) {
           onShakeRef.current();
-          // Debounce: ignore shakes for 1.5s after triggering
           shakeTimeout.current = setTimeout(() => { shakeTimeout.current = null; }, 1500);
         }
       }
@@ -313,10 +351,8 @@ function useShakeDetection(onShake) {
       window.addEventListener("devicemotion", handleMotion);
     };
 
-    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
-      DeviceMotionEvent.requestPermission()
-        .then((perm) => { if (perm === "granted") startListening(); })
-        .catch(() => {});
+    if (motionPermissions.needsRequest) {
+      motionPermissions.onGranted(startListening);
     } else {
       startListening();
     }
@@ -1136,7 +1172,7 @@ export default function Switcheroo() {
         {/* ── Drop Zone ───────────────────────────────────────────────── */}
         <div
           ref={dropZoneRef}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => { motionPermissions.request(); inputRef.current?.click(); }}
           style={{
             borderRadius: 28,
             padding: dropPadding,
