@@ -218,8 +218,127 @@ function WaterRipple({ trigger, originY }) {
   );
 }
 
+// ─── Gyroscope Hook ─────────────────────────────────────────────────────────
+// Reads device orientation and returns smoothed tilt values (−1 to 1).
+// Falls back to { x: 0, y: 0 } on desktop / permission denied.
+function useGyroscope() {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const smoothRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMob = /iPhone|iPad|iPod|Android/i.test(navigator?.userAgent || "");
+    if (!isMob) return;
+
+    let active = true;
+    let frame;
+
+    const handleOrientation = (e) => {
+      // gamma = left/right tilt (−90 to 90), beta = front/back (−180 to 180)
+      const rawX = Math.max(-1, Math.min(1, (e.gamma || 0) / 35));
+      const rawY = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 35));
+      smoothRef.current = { x: rawX, y: rawY };
+    };
+
+    const tick = () => {
+      if (!active) return;
+      setTilt((prev) => ({
+        x: prev.x + (smoothRef.current.x - prev.x) * 0.08,
+        y: prev.y + (smoothRef.current.y - prev.y) * 0.08,
+      }));
+      frame = requestAnimationFrame(tick);
+    };
+
+    const startListening = () => {
+      window.addEventListener("deviceorientation", handleOrientation);
+      frame = requestAnimationFrame(tick);
+    };
+
+    // iOS 13+ requires permission
+    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+      DeviceOrientationEvent.requestPermission()
+        .then((perm) => { if (perm === "granted") startListening(); })
+        .catch(() => {});
+    } else {
+      startListening();
+    }
+
+    return () => {
+      active = false;
+      cancelAnimationFrame(frame);
+      window.removeEventListener("deviceorientation", handleOrientation);
+    };
+  }, []);
+
+  return tilt;
+}
+
+// ─── Shake Detection Hook ───────────────────────────────────────────────────
+// Detects phone shake gestures and calls the callback.
+function useShakeDetection(onShake) {
+  const lastAccel = useRef({ x: 0, y: 0, z: 0 });
+  const shakeTimeout = useRef(null);
+  const onShakeRef = useRef(onShake);
+  onShakeRef.current = onShake;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMob = /iPhone|iPad|iPod|Android/i.test(navigator?.userAgent || "");
+    if (!isMob) return;
+
+    const SHAKE_THRESHOLD = 25;
+    let lastTime = 0;
+
+    const handleMotion = (e) => {
+      const accel = e.accelerationIncludingGravity;
+      if (!accel) return;
+      const now = Date.now();
+      if (now - lastTime < 100) return; // throttle to 10fps
+      const dx = Math.abs(accel.x - lastAccel.current.x);
+      const dy = Math.abs(accel.y - lastAccel.current.y);
+      const dz = Math.abs(accel.z - lastAccel.current.z);
+      lastAccel.current = { x: accel.x, y: accel.y, z: accel.z };
+      lastTime = now;
+
+      if (dx + dy + dz > SHAKE_THRESHOLD) {
+        if (!shakeTimeout.current) {
+          onShakeRef.current();
+          // Debounce: ignore shakes for 1.5s after triggering
+          shakeTimeout.current = setTimeout(() => { shakeTimeout.current = null; }, 1500);
+        }
+      }
+    };
+
+    const startListening = () => {
+      window.addEventListener("devicemotion", handleMotion);
+    };
+
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      DeviceMotionEvent.requestPermission()
+        .then((perm) => { if (perm === "granted") startListening(); })
+        .catch(() => {});
+    } else {
+      startListening();
+    }
+
+    return () => {
+      window.removeEventListener("devicemotion", handleMotion);
+      if (shakeTimeout.current) clearTimeout(shakeTimeout.current);
+    };
+  }, []);
+}
+
+// ─── Haptics Helper ─────────────────────────────────────────────────────────
+// Fires a short vibration. No-op on devices that don't support it.
+function haptic(pattern = 15) {
+  try { navigator?.vibrate?.(pattern); } catch {}
+}
+
 // ─── Mesh Background ────────────────────────────────────────────────────────
-function MeshBackground() {
+function MeshBackground({ tilt }) {
+  // Shift gradient blob positions based on gyroscope tilt
+  const offsetX = tilt.x * 6; // percent shift
+  const offsetY = tilt.y * 4;
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 0, overflow: "hidden" }}>
       <div style={{
@@ -229,12 +348,13 @@ function MeshBackground() {
       <div style={{
         position: "absolute", inset: "-20%",
         background: `
-          radial-gradient(ellipse 600px 400px at 20% 30%, rgba(251,191,36,0.12) 0%, transparent 70%),
-          radial-gradient(ellipse 500px 500px at 80% 20%, rgba(236,72,153,0.10) 0%, transparent 70%),
-          radial-gradient(ellipse 700px 350px at 60% 80%, rgba(59,130,246,0.09) 0%, transparent 70%),
-          radial-gradient(ellipse 400px 600px at 10% 70%, rgba(16,185,129,0.10) 0%, transparent 70%),
-          radial-gradient(ellipse 500px 400px at 90% 60%, rgba(139,92,246,0.08) 0%, transparent 70%)
+          radial-gradient(ellipse 600px 400px at ${20 + offsetX}% ${30 + offsetY}%, rgba(251,191,36,0.12) 0%, transparent 70%),
+          radial-gradient(ellipse 500px 500px at ${80 - offsetX}% ${20 + offsetY}%, rgba(236,72,153,0.10) 0%, transparent 70%),
+          radial-gradient(ellipse 700px 350px at ${60 + offsetX * 0.7}% ${80 - offsetY}%, rgba(59,130,246,0.09) 0%, transparent 70%),
+          radial-gradient(ellipse 400px 600px at ${10 - offsetX * 0.5}% ${70 + offsetY * 0.8}%, rgba(16,185,129,0.10) 0%, transparent 70%),
+          radial-gradient(ellipse 500px 400px at ${90 + offsetX}% ${60 - offsetY * 0.6}%, rgba(139,92,246,0.08) 0%, transparent 70%)
         `,
+        transition: "background 0.15s ease-out",
         animation: "meshDrift 25s ease-in-out infinite alternate",
       }} />
       <div style={{
@@ -247,16 +367,49 @@ function MeshBackground() {
 }
 
 // ─── Color Pairs ─────────────────────────────────────────────────────────────
-// Each visit gets a random duo. Neon, fun, two colors at a time.
-const COLOR_PAIRS = [
-  ["#0d9488", "#84cc16"], // dark teal → lime
-  ["#f97316", "#ec4899"], // orange → hot pink
-  ["#3b82f6", "#8b5cf6"], // electric blue → violet
-  ["#06b6d4", "#facc15"], // cyan → yellow
-  ["#e11d48", "#fb923c"], // rose → tangerine
-  ["#8b5cf6", "#22d3ee"], // violet → aqua
-];
-const chosenPair = COLOR_PAIRS[Math.floor(Math.random() * COLOR_PAIRS.length)];
+// Time-of-day influenced palette. Warm tones at golden hour, cool at night,
+// fresh in the morning. Within each time bracket we still pick randomly
+// so every visit feels unique.
+const TIME_PALETTES = {
+  // 6am–10am: fresh, energetic morning
+  morning: [
+    ["#f59e0b", "#10b981"], // amber → emerald
+    ["#06b6d4", "#84cc16"], // cyan → lime
+    ["#0d9488", "#84cc16"], // teal → lime
+  ],
+  // 10am–4pm: bright, punchy midday
+  midday: [
+    ["#3b82f6", "#8b5cf6"], // blue → violet
+    ["#f97316", "#ec4899"], // orange → hot pink
+    ["#06b6d4", "#facc15"], // cyan → yellow
+    ["#8b5cf6", "#22d3ee"], // violet → aqua
+  ],
+  // 4pm–8pm: warm golden hour
+  golden: [
+    ["#f97316", "#ec4899"], // orange → hot pink
+    ["#e11d48", "#fb923c"], // rose → tangerine
+    ["#f59e0b", "#ef4444"], // amber → red
+    ["#ec4899", "#f59e0b"], // pink → amber
+  ],
+  // 8pm–6am: cool, moody night
+  night: [
+    ["#8b5cf6", "#22d3ee"], // violet → aqua
+    ["#3b82f6", "#8b5cf6"], // blue → violet
+    ["#6366f1", "#06b6d4"], // indigo → cyan
+    ["#7c3aed", "#ec4899"], // purple → pink
+  ],
+};
+
+function getTimePalette() {
+  const hour = new Date().getHours();
+  if (hour >= 6 && hour < 10) return TIME_PALETTES.morning;
+  if (hour >= 10 && hour < 16) return TIME_PALETTES.midday;
+  if (hour >= 16 && hour < 20) return TIME_PALETTES.golden;
+  return TIME_PALETTES.night;
+}
+
+const chosenPalette = getTimePalette();
+const chosenPair = chosenPalette[Math.floor(Math.random() * chosenPalette.length)];
 
 // ─── Logo ───────────────────────────────────────────────────────────────────
 function Logo() {
@@ -574,6 +727,19 @@ export default function Switcheroo() {
   const inputRef = useRef(null);
   const dragCountRef = useRef(0);
   const { suggestion, fade } = useRotatingSuggestion();
+  const gyroTilt = useGyroscope();
+
+  // ── Shake to clear (mobile only) ──
+  const [shakeExit, setShakeExit] = useState(false);
+  useShakeDetection(() => {
+    if (files.length === 0) return;
+    haptic([15, 50, 25]); // short buzz pattern
+    setShakeExit(true);
+    setTimeout(() => {
+      clearAllFn();
+      setShakeExit(false);
+    }, 600);
+  });
 
   // ── PDF Merge state ──
   const [mergeStatus, setMergeStatus] = useState(null); // null | "merging" | "done" | "error"
@@ -595,6 +761,7 @@ export default function Switcheroo() {
   const addFiles = useCallback((newFiles) => {
     const arr = Array.from(newFiles);
     setFiles((prev) => [...prev, ...arr]);
+    haptic(10); // light tap on file add
     arr.forEach((f) => {
       const label = FORMATS[detectType(f)]?.label || "unsupported";
       track("file_added", { format: label });
@@ -769,6 +936,7 @@ export default function Switcheroo() {
             setDownloads((d) => ({ ...d, [key]: URL.createObjectURL(converted) }));
             setStatuses((s) => ({ ...s, [key]: "done" }));
             setTotalConverted((c) => c + 1);
+            haptic([10, 30, 10]);
             track("file_converted", { source_format: "HEIC", target_format: targetFormat });
             return;
           } catch (heicErr) {
@@ -796,6 +964,7 @@ export default function Switcheroo() {
 
       setStatuses((s) => ({ ...s, [key]: "done" }));
       setTotalConverted((c) => c + 1);
+      haptic([10, 30, 10]); // satisfying double-tap on success
       const srcLabel = FORMATS[detectType(file)]?.label || "unknown";
       track("file_converted", { source_format: srcLabel, target_format: targetFormat });
     } catch (err) {
@@ -888,12 +1057,12 @@ export default function Switcheroo() {
     }
   }, [files, mergeUrl]);
 
-  const clearAll = () => {
+  const clearAllFn = useCallback(() => {
     Object.values(downloads).forEach(URL.revokeObjectURL);
     if (mergeUrl) URL.revokeObjectURL(mergeUrl);
     setFiles([]); setStatuses({}); setDownloads({}); setTargets({});
     setMergeStatus(null); setMergeUrl(null);
-  };
+  }, [downloads, mergeUrl]);
 
   const pendingFiles = files.filter((f) => !statuses[f.name + f.lastModified]);
   const commonTargets = pendingFiles.length > 1
@@ -938,7 +1107,7 @@ export default function Switcheroo() {
         display: "flex", flexDirection: "column",
         justifyContent: "center",
       }}>
-      <MeshBackground />
+      <MeshBackground tilt={gyroTilt} />
       <WaterRipple trigger={rippleCount} originY={rippleY} />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 580, margin: "0 auto", padding: "0 20px 40px", width: "100%" }}>
@@ -1151,7 +1320,12 @@ export default function Switcheroo() {
             {files.map((f, i) => {
               const key = f.name + f.lastModified;
               return (
-                <div key={key} style={{ animationDelay: `${i * 0.06}s` }}>
+                <div key={key} style={{
+                  animationDelay: `${i * 0.06}s`,
+                  ...(shakeExit ? {
+                    animation: `shakeTumble 0.6s ${i * 0.05}s cubic-bezier(0.36, 0, 0.66, -0.56) forwards`,
+                  } : {}),
+                }}>
                   <FileCard
                     file={f}
                     status={statuses[key]}
@@ -1169,7 +1343,7 @@ export default function Switcheroo() {
         {/* ── Clear ───────────────────────────────────────────────────── */}
         {files.length > 0 && (
           <div style={{ textAlign: "center", marginTop: 28 }}>
-            <button onClick={clearAll} style={{
+            <button onClick={clearAllFn} style={{
               padding: "10px 24px", borderRadius: 12,
               border: "1.5px solid rgba(0,0,0,0.06)",
               background: "rgba(255,255,255,0.6)", backdropFilter: "blur(8px)",
@@ -1333,6 +1507,24 @@ export default function Switcheroo() {
           }
           100% {
             transform: scale(1);
+          }
+        }
+        @keyframes shakeTumble {
+          0% {
+            opacity: 1;
+            transform: translateX(0) rotate(0deg);
+          }
+          30% {
+            opacity: 0.8;
+            transform: translateX(40px) rotate(8deg);
+          }
+          60% {
+            opacity: 0.4;
+            transform: translateX(-30px) translateY(60px) rotate(-12deg);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(80px) translateY(200px) rotate(25deg);
           }
         }
         * { box-sizing: border-box; }
